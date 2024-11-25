@@ -6,7 +6,7 @@ import math
 import random
 
 def onAppStart(app):
-    app.width = 1980
+    app.width = 1920
     app.height = 900
 
     #Map Variables
@@ -82,7 +82,7 @@ def redrawAll(app):
     if app.currentMouseX != None and app.currentMouseY != None:
         drawCursor(app)
     for bullet in app.bullets:
-        if bullet.x > 0 and bullet.x < 1000 and bullet.y > 0 and bullet.y < 1000:
+        if bullet.x > 0 and bullet.x < app.width and bullet.y > 0 and bullet.y < app.height:
             drawCircle(bullet.x, bullet.y, bullet.radius, fill=bullet.fill)
     for enemy in app.enemies:
         drawTriangle(enemy.x, enemy.y, enemy.size, enemy.fill)
@@ -115,10 +115,11 @@ def onStep(app):
 
     #Check and update bullets
     for bullet in app.bullets:
-        if bullet.x > 0 and bullet.x < 1000 and bullet.y > 0 and bullet.y < 1000:
+        if bullet.x > 0 and bullet.x < app.width and bullet.y > 0 and bullet.y < app.height:
             bullet.x += bullet.dx
             bullet.y += bullet.dy
         else:
+            print('delete')
             app.bullets.remove(bullet)
     # manages the enemies in the game
     for enemy in app.enemies:
