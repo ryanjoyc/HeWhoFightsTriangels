@@ -1,6 +1,7 @@
 from cmu_graphics import *
 from bullet import Bullet
 from enemy import Enemy
+from room import Room
 import math
 import random
 
@@ -8,8 +9,15 @@ def onAppStart(app):
     app.width = 1980
     app.height = 900
 
+    #Map Variables
+    app.map = createMap()
+    app.currentPlatforms = []
+
+    # Find where the player is:
+    app.currentRoom = app.map[2][1] # Just to make sure the first room loads properly for testing the function drawRoom()
+
     #Object Variable 
-    app.floorPlatformHeight = 100
+    app.floorPlatformHeight = 50
     app.floorPlatformY = (app.height - app.floorPlatformHeight)
 
     #Bullet Variables
@@ -21,7 +29,7 @@ def onAppStart(app):
     #Player variables
     app.pr = 30
     app.pcolor = gradient('red', 'black')
-    app.px = 50
+    app.px = app.width / 2
     app.changepx = 0
     app.changepy = 0
     app.py = app.floorPlatformY - app.pr
@@ -67,7 +75,9 @@ def onKeyHold(app, keys):
         app.changepx += 20
 
 def redrawAll(app):
-    drawMap(app)
+    halfHeight = app.height / 2
+    halfWidth = app.width / 2
+    drawRoom(app, app.currentRoom)
     drawCircle(app.px, app.py, app.pr, fill=app.pcolor)
     if app.currentMouseX != None and app.currentMouseY != None:
         drawCursor(app)
@@ -86,16 +96,14 @@ def onMouseMove(app, mouseX, mouseY):
 
 
 def onStep(app):
-    #Recreate variables
-    dx = app.changepx / 5
-    app.changepx -= dx
-    app.px += dx
+    #Recreate variables, some are just for conveniece right now like app.playerBottom which just made the falling calculation more intuitive
+    move(app)
     app.playerBottom = app.py + (app.pr)
     fall(app)
     
  
     #Check if the player is on the ground
-    if app.playerBottom >= app.floorPlatformY:
+    if app.playerBottom >= app.height - 50:
         app.isOnGround = True
         app.isJumping = False
         app.pdy = 0
@@ -134,31 +142,141 @@ def onStep(app):
 def takeStep(app):
     pass
 
-def drawMap(app):
-    drawRect(0, app.height - app.floorPlatformHeight, app.width, app.floorPlatformHeight)
+# Can possible add a level variable that will incrementally increase the number of enemies in each room
+def createMap():
+    map = [[Room(False, randomEnemyCount(3, 5), createRoom(), '0011'), Room(False, randomEnemyCount(3, 5), createRoom(), '1011'), Room(False, randomEnemyCount(3, 5), createRoom(), '1001')],
+           [Room(False, randomEnemyCount(3, 5), createRoom(), '0111'), Room(False, randomEnemyCount(3, 5), createRoom(), '1111'), Room(False, randomEnemyCount(3, 5), createRoom(), '1101')],
+           [Room(False, randomEnemyCount(3, 5), createRoom(), '0110'), Room(True, 0, createRoom(), '1110'),                       Room(False, randomEnemyCount(3, 5), createRoom(), '1100')]]
+    return map
+
+def createRoom():
+    room = []
+    for i in range(2):
+        floor = ''
+        gapIndex = math.floor(random.random() * 3)
+        for i in range(3):
+            if i == gapIndex:
+                floor += '0'
+            else:
+                floor += '1'
+        room.append(floor)
+    return room
+
+def drawRoom(app, room):
+    halfHeight = app.height / 2
+    halfWidth = app.width / 2
+    platformWidth = ((app.width - 100) / 3)
+
+    if int(room.doors[0]) == 1:
+        drawRect(0, 0, 50, halfHeight - 50)
+        drawRect(0, halfHeight + 50, 50, app.height)
+    else:
+        drawRect(0, 0, 50, app.height)
+
+    if int(room.doors[1]) == 1:
+        drawRect(0, 0, halfWidth - 50, 50)
+        drawRect(halfWidth + 50, 0, app.width, 50)
+    else:
+        drawRect(0, 0, 50, 50)
+
+    if int(room.doors[2]) == 1:
+        drawRect(app.width - 50, 0, app.width, halfHeight - 50)
+        drawRect(app.width - 50, halfHeight + 50, app.width, app.height)
+    else:
+        drawRect(app.width - 50, 0, app.width, app.height)
+    
+    if int(room.doors[3]) == 1:
+        drawRect(0, app.height - 50, halfWidth - 50, app.height)
+        drawRect(halfWidth + 50, app.height - 50, app.width, app.height)
+    else:
+        drawRect(0, app.height - 50, app.width, app.height)
+    for i in range(2):
+        for j in range(3):
+            if app.currentRoom.map[i][j] == '1':
+                drawRect(50 + platformWidth * j, 550 - 350 * i, platformWidth, 50)
+                app.currentPlatforms.append((50 + platformWidth * j, 550 - 350 * i, 50 + platformWidth * j + platformWidth, 550 - 350 * i + 50)) # Convert to top left and bottom right
+
+def randomEnemyCount(min, max):
+    return rounded(random.random() * (max - min)) + min
 
 def drawCursor(app):
     drawCircle(app.currentMouseX, app.currentMouseY, 20, fill='white', border='black', borderWidth=1, opacity=100)
 
 def fall(app):
     distanceToGround = app.floorPlatformY - app.playerBottom
+    distanceToRoof = app.py - 100
     if app.pdy > 0 and app.pdy > distanceToGround:
         app.py = app.floorPlatformY - app.pr
         app.pdy = 0
+        # for platform in app.currentPlatforms:
+        #     distanceToPlatform = platform[1] - app.playerBottom
+        #     if app.pdy > distanceToPlatform:
+        #         app.py = platform[1] - app.pr
+        #         app.pdy = 0
+    elif app.pdy < 0 and abs(app.pdy) > distanceToRoof:
+        app.py = 100 + app.pr
+        app.pdy = 0 
     else:
         app.py += app.pdy
 
-def isColliding(enemy, bullet):
-    if not isinstance(enemy, Enemy) or not isinstance(bullet, Bullet):
-        return False
-    enemyPoints = [(enemy.x, enemy.y), (enemy.x + enemy.size, enemy.y), (enemy.x + (enemy.size / 2), enemy.y + (enemy.size *(math.sqrt(3) / 2))), (enemy.x + (enemy.size / 2), (enemy.y + (enemy.size *(math.sqrt(3) / 2))) / 2)]
+# Here is the move function, but we are also gonna incorporate the collision and registering those effects on movement here too
+def move(app):
+    dx = app.changepx / 5
+    app.changepx -= dx
+    futurePX = app.px + dx
+    if isHittingBoundary(futurePX, app):
+        dx = 0
+    else:
+        app.px += dx
 
-    for point in enemyPoints:
-        distance = getDistance(bullet.x, bullet.y, point[0], point[1])
-        if distance <= bullet.radius:
+# Checking if the player will be hitting a wall
+def isHittingBoundary(px, app):
+    doors = app.currentRoom.doors
+    halfHeight = app.height / 2
+    halfWidth = app.width / 2
+    walls = []
+    # Similar process to drawing the walls, but I am re-using the code to extract the points for all the rectangles that are the walls
+    # This works at the moment, but might actually be bugged...
+    if int(doors[0]) == 1:
+        walls.append((0, 0, 50, halfHeight - 50))
+        walls.append((0, halfHeight + 50, 50, app.height))
+    else:
+        walls.append((0, 0, 50, app.height))
+
+    if int(doors[2]) == 1:
+        walls.append((app.width - 50, 0, app.width, halfHeight - 50))
+        walls.append((app.width - 50, halfHeight + 50, app.width, app.height))
+    else:
+        walls.append((app.width - 50, 0, app.width, app.height))
+
+    # Now that we have all the points for the walls of the rectangle, we can check if the player intersects with any of them
+    # Side Notes : I thought that by extracting the walls of every room would be easier as the walls change every time the player moves a room
+    # This will also allow me to be more playful later on if I want to change the design of how the walls are lined...
+
+    for wall in walls:
+        if playerIntersectingWall(px, app.py, app.pr, wall[0], wall[1], wall[2], wall[3]):
+            if app.changepx > 0:
+                app.px = wall[0] - app.pr
+            elif app.changepx < 0:
+                app.px = wall[2] + app.pr
             return True
-        
+    
     return False
+
+    
+# This is a function that's job is simple, but it's process is somewhat hard to understand intuitively. I want to thank again ChatGPT for helping me come up with it.
+def playerIntersectingWall(cx, cy, r, x1, y1, x2, y2):
+  
+    closest_x = max(x1, min(cx, x2)) # the rectacles bound is between its top right, x1, or its bottom left, x2, otherwise its between the two so we get cx
+    closest_y = max(y1, min(cy, y2)) # same principle applies here too
+
+    # Calculate the distance between the circle's center and this closest point
+    distance_x = cx - closest_x
+    distance_y = cy - closest_y
+
+    # Check if the distance is less than or equal to the radius
+    return (distance_x ** 2 + distance_y ** 2) <= (r ** 2)
+
     
 def getDistance(x1, y1, x2, y2):
     return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
@@ -208,5 +326,11 @@ def isColliding(enemy, bullet):
 # Simple drawTriangle function that can take 
 def drawTriangle(topLeftX, topLeftY, side, fill):
     drawPolygon(topLeftX, topLeftY, topLeftX + side, topLeftY, topLeftX + side / 2, topLeftY + (side * (math.sqrt(3)  / 2)), fill=fill)
+
+def findPlayer(app):
+    for level in app.map:
+        for room in level:
+            if room.player == True:
+                app.currentRoom = room
 
 cmu_graphics.runApp()
