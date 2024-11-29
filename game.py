@@ -12,8 +12,11 @@ def onAppStart(app):
     #Map Variables
     app.map = createMap()
     app.currentPlatforms = []
+    app.currentDoors = []
 
     # Find where the player is:
+    app.mapCurrentY = 2
+    app.mapCurrentX = 1
     app.currentRoom = app.map[2][1] # Just to make sure the first room loads properly for testing the function drawRoom()
     loadRoom(app)
 
@@ -170,24 +173,28 @@ def drawRoom(app, room):
 
     if int(room.doors[0]) == 1:
         drawRect(0, 0, 50, halfHeight - 50)
+        drawRect(0, halfHeight - 50, 50, halfHeight + 50, fill='red')
         drawRect(0, halfHeight + 50, 50, app.height)
     else:
         drawRect(0, 0, 50, app.height)
 
     if int(room.doors[1]) == 1:
         drawRect(0, 0, halfWidth - 50, 50)
+        drawRect(halfWidth - 50, 0, halfWidth + 50, 50, fill='red')
         drawRect(halfWidth + 50, 0, app.width, 50)
     else:
         drawRect(0, 0, 50, 50)
 
     if int(room.doors[2]) == 1:
         drawRect(app.width - 50, 0, app.width, halfHeight - 50)
+        drawRect(app.width - 50, halfHeight - 50, app.width, halfHeight + 50, fill='red')
         drawRect(app.width - 50, halfHeight + 50, app.width, app.height)
     else:
         drawRect(app.width - 50, 0, app.width, app.height)
     
     if int(room.doors[3]) == 1:
         drawRect(0, app.height - 50, halfWidth - 50, app.height)
+        drawRect(halfWidth - 50, app.height - 50, halfWidth + 50, app.height)
         drawRect(halfWidth + 50, app.height - 50, app.width, app.height)
     else:
         drawRect(0, app.height - 50, app.width, app.height)
@@ -197,12 +204,28 @@ def drawRoom(app, room):
                 drawRect(50 + platformWidth * j, 550 - 350 * i, platformWidth, 50)
 
 def loadRoom(app):
+    #Reset the current platforms everytime the character loads a new room
     app.currentPlatforms = []
     platformWidth = ((app.width - 100) / 3)
+    #Filter through and add all platforms to a list containing the top right and bottom left corner of all the platforms
     for i in range(2):
         for j in range(3):
             if app.currentRoom.map[i][j] == '1':
                 app.currentPlatforms.append((50 + platformWidth * j, 550 - 350 * i, 50 + platformWidth * j + platformWidth, 550 - (350 * i) + 50)) # Convert to top left and bottom right
+
+    #Add all door paramters into the a list containg the corners of all doors in the currently loaded room
+    halfHeight = app.height / 2
+    halfWidth = app.width / 2
+    doors = app.currentRoom.doors
+    app.currentDoors = []
+    if int(doors[0]) == 1:
+        app.currentDoors.append((0, halfHeight - 50, 50, halfHeight + 50))
+    if int(doors[1]) == 1:
+        app.currentDoors.append((halfWidth - 50, 0, halfWidth + 50, 50))
+    if int(doors[2]) == 1:
+        app.currentDoors.append((app.width - 50, halfHeight - 50, app.width, halfHeight + 50))
+    if int(doors[3]) == 1:
+        app.currentDoors.append((halfWidth - 50, app.height - 50, halfWidth + 50, app.height))
 
 
 def randomEnemyCount(min, max):
@@ -218,9 +241,10 @@ def movePlayer(app):
     futurePlayerBottom = futurePY + app.pr
 
     # Make a collision object, that way we don't have to run function multiple times, will store a true or false so we can still easily check
-    collision = collisionWithPlatforms(app, futurePX, futurePY)
-    if collision[0]:
-        platform = collision[1]
+    platformCollision = collisionWithPlatforms(app, futurePX, futurePY)
+    doorCollision = collisionWithDoors(app, futurePX, futurePY)
+    if platformCollision[0]:
+        platform = platformCollision[1]
         if app.pdy > 0 and futurePlayerBottom >= platform[1] and currentPlayerBottom < platform[1]:
             app.pcolor = 'red'
             app.isFalling = False
@@ -235,12 +259,29 @@ def movePlayer(app):
             app.pcolor = 'cyan'
             fall(app)
             move(app)
+    elif doorCollision[0]:
+        doorNumber = doorCollision[2]
+        if doorNumber == 0:
+            app.mapCurrentX -= 1
+            app.currentRoom = app.map[app.mapCurrentY][app.mapCurrentX]
+            loadRoom(app)
     else:
         app.isFalling = True
         app.pcolor = 'blue'   
         fall(app)
         move(app)
     
+def collisionWithDoors(app, futurePX, futurePY):
+    door = None
+    doorNumber = 0
+    
+    for door in app.currentDoors:
+        if playerIntersectingRectangle(futurePX, futurePY, app.pr, door[0], door[1], door[2], door[3]):
+            door = (door[0], door[1], door[2], door[3])
+            return (True, door, doorNumber)
+        doorNumber += 1
+    return (False, None)
+
 def collisionWithPlatforms(app, futurePX, futurePY):
     platform = None
 
