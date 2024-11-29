@@ -6,7 +6,7 @@ import math
 import random
 
 def onAppStart(app):
-    app.width = 1920
+    app.width = 1700
     app.height = 900
 
     #Map Variables
@@ -15,6 +15,7 @@ def onAppStart(app):
 
     # Find where the player is:
     app.currentRoom = app.map[2][1] # Just to make sure the first room loads properly for testing the function drawRoom()
+    loadRoom(app)
 
     #Object Variable 
     app.floorPlatformHeight = 50
@@ -30,8 +31,7 @@ def onAppStart(app):
     app.pr = 30
     app.pcolor = gradient('red', 'black')
     app.px = app.width / 2
-    app.changepx = 0
-    app.changepy = 0
+    app.pdx = 0
     app.py = app.floorPlatformY - app.pr
     app.pdy = 0
 
@@ -42,26 +42,28 @@ def onAppStart(app):
     app.currentMouseX = None
     app.currentMouseY = None
     app.isOnGround = True
-    app.isJumping = False
+    app.isFalling = False
     app.jumps = 2
 
     app.stepsPerSecond = 60
 
 def onKeyPress(app, key):
+    if key == 'r':
+        app.pr = 30
     if key == 'a':
-        app.changepx -= 100
+        app.pdx -= 100
     if key == 'd':
-        app.changepx += 100
+        app.pdx += 100
     if key == 'space' and app.isOnGround or key == 'space' and app.jumps > 0:
         app.isOnGround = False
-        if app.isJumping == False:
-            app.isJumping = True
-            app.jumps -= 1
+        if app.isFalling == False:
+            app.isFalling = True
+            #app.jumps -= 1
             app.py -= 1
             app.pdy -= 20
         else:
             app.pdy = -20
-            app.jumps -= 1
+            #app.jumps -= 1
     if key == 'q':
         app.quit()
     if key == 't':
@@ -70,9 +72,9 @@ def onKeyPress(app, key):
 
 def onKeyHold(app, keys):
     if 'a' in keys:
-        app.changepx -= 20
+        app.pdx -= 20
     elif 'd' in keys:
-        app.changepx += 20
+        app.pdx += 20
 
 def redrawAll(app):
     halfHeight = app.height / 2
@@ -97,20 +99,19 @@ def onMouseMove(app, mouseX, mouseY):
 
 def onStep(app):
     #Recreate variables, some are just for conveniece right now like app.playerBottom which just made the falling calculation more intuitive
-    move(app)
-    app.playerBottom = app.py + (app.pr)
-    fall(app)
+    movePlayer(app)
     
  
     #Check if the player is on the ground
     if app.playerBottom >= app.height - 50:
         app.isOnGround = True
-        app.isJumping = False
+        app.isFalling = False
         app.pdy = 0
         app.jumps = 2
 
-    #Creating the ability to jump
-    if app.isJumping:
+    # Change the players current velocity values
+    app.pdx = app.pdx - (app.pdx / 5)
+    if app.isFalling:
         app.pdy += 1
 
     #Check and update bullets
@@ -119,7 +120,6 @@ def onStep(app):
             bullet.x += bullet.dx
             bullet.y += bullet.dy
         else:
-            print('delete')
             app.bullets.remove(bullet)
     # manages the enemies in the game
     for enemy in app.enemies:
@@ -195,7 +195,15 @@ def drawRoom(app, room):
         for j in range(3):
             if app.currentRoom.map[i][j] == '1':
                 drawRect(50 + platformWidth * j, 550 - 350 * i, platformWidth, 50)
-                app.currentPlatforms.append((50 + platformWidth * j, 550 - 350 * i, 50 + platformWidth * j + platformWidth, 550 - 350 * i + 50)) # Convert to top left and bottom right
+
+def loadRoom(app):
+    app.currentPlatforms = []
+    platformWidth = ((app.width - 100) / 3)
+    for i in range(2):
+        for j in range(3):
+            if app.currentRoom.map[i][j] == '1':
+                app.currentPlatforms.append((50 + platformWidth * j, 550 - 350 * i, 50 + platformWidth * j + platformWidth, 550 - (350 * i) + 50)) # Convert to top left and bottom right
+
 
 def randomEnemyCount(min, max):
     return rounded(random.random() * (max - min)) + min
@@ -203,32 +211,67 @@ def randomEnemyCount(min, max):
 def drawCursor(app):
     drawCircle(app.currentMouseX, app.currentMouseY, 20, fill='white', border='black', borderWidth=1, opacity=100)
 
+def movePlayer(app):
+    futurePX = app.px + (app.pdx / 5)
+    futurePY = app.py + app.pdy
+    currentPlayerBottom = app.py + app.pr
+    futurePlayerBottom = futurePY + app.pr
+
+    # Make a collision object, that way we don't have to run function multiple times, will store a true or false so we can still easily check
+    collision = collisionWithPlatforms(app, futurePX, futurePY)
+    if collision[0]:
+        platform = collision[1]
+        if app.pdy > 0 and futurePlayerBottom >= platform[1] and currentPlayerBottom < platform[1]:
+            app.pcolor = 'red'
+            app.isFalling = False
+            app.pdy = 0
+            app.py = platform[1] - app.pr
+            move(app)
+        elif app.pdy <= 0 and currentPlayerBottom > platform[1]:
+            app.pcolor = 'purple'
+            move(app)
+            fall(app)
+        else:
+            app.pcolor = 'cyan'
+            fall(app)
+            move(app)
+    else:
+        app.isFalling = True
+        app.pcolor = 'blue'   
+        fall(app)
+        move(app)
+    
+def collisionWithPlatforms(app, futurePX, futurePY):
+    platform = None
+
+    for platform in app.currentPlatforms:
+        if playerIntersectingRectangle(futurePX, futurePY, app.pr, platform[0], platform[1], platform[2], platform[3]):
+            platform = (platform[0], platform[1], platform[2], platform[3])
+            return (True, platform)
+    return (False, None)
+
+
 def fall(app):
+    app.playerBottom = app.py + (app.pr)
     distanceToGround = app.floorPlatformY - app.playerBottom
-    distanceToRoof = app.py - 100
+    distanceToRoof = app.py - 80
     if app.pdy > 0 and app.pdy > distanceToGround:
         app.py = app.floorPlatformY - app.pr
         app.pdy = 0
-        # for platform in app.currentPlatforms:
-        #     distanceToPlatform = platform[1] - app.playerBottom
-        #     if app.pdy > distanceToPlatform:
-        #         app.py = platform[1] - app.pr
-        #         app.pdy = 0
+        app.isFalling = False
     elif app.pdy < 0 and abs(app.pdy) > distanceToRoof:
-        app.py = 100 + app.pr
+        app.py = 50 + app.pr
         app.pdy = 0 
     else:
         app.py += app.pdy
 
 # Here is the move function, but we are also gonna incorporate the collision and registering those effects on movement here too
 def move(app):
-    dx = app.changepx / 5
-    app.changepx -= dx
-    futurePX = app.px + dx
+    futurePX = app.px + (app.pdx / 5)
     if isHittingBoundary(futurePX, app):
         dx = 0
     else:
-        app.px += dx
+        app.px = futurePX
 
 # Checking if the player will be hitting a wall
 def isHittingBoundary(px, app):
@@ -255,10 +298,10 @@ def isHittingBoundary(px, app):
     # This will also allow me to be more playful later on if I want to change the design of how the walls are lined...
 
     for wall in walls:
-        if playerIntersectingWall(px, app.py, app.pr, wall[0], wall[1], wall[2], wall[3]):
-            if app.changepx > 0:
+        if playerIntersectingRectangle(px, app.py, app.pr, wall[0], wall[1], wall[2], wall[3]):
+            if app.pdx > 0:
                 app.px = wall[0] - app.pr
-            elif app.changepx < 0:
+            elif app.pdx < 0:
                 app.px = wall[2] + app.pr
             return True
     
@@ -266,7 +309,7 @@ def isHittingBoundary(px, app):
 
     
 # This is a function that's job is simple, but it's process is somewhat hard to understand intuitively. I want to thank again ChatGPT for helping me come up with it.
-def playerIntersectingWall(cx, cy, r, x1, y1, x2, y2):
+def playerIntersectingRectangle(cx, cy, r, x1, y1, x2, y2):
   
     closest_x = max(x1, min(cx, x2)) # the rectacles bound is between its top right, x1, or its bottom left, x2, otherwise its between the two so we get cx
     closest_y = max(y1, min(cy, y2)) # same principle applies here too
