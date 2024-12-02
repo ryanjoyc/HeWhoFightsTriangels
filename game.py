@@ -80,10 +80,8 @@ def story_onScreenActivate(app):
     app.background = 'white'
 
 def story_onKeyPress(app, key):
-    if key == '1':
-        app.testAngle += 10
-    if key == '2':
-        app.testAngle -= 10
+    # if key == '1':
+    #     loadBossRoom(app)
     if key == 's':
         app.pdy += 2
         app.isFalling = True
@@ -93,16 +91,16 @@ def story_onKeyPress(app, key):
         app.pdx -= 100
     if key == 'd':
         app.pdx += 100
-    if ((key == 'space' or key == 'w') and app.isOnGround) or ((key == 'space' or key == 'w') and app.jumps > 0):
+    if ((key == 'space') and app.isOnGround) or ((key == 'space') and app.jumps > 0):
         app.isOnGround = False
         if app.isFalling == False:
             app.isFalling = True
-            #app.jumps -= 1
+            app.jumps -= 1
             app.py -= 1
             app.pdy -= 20
         else:
             app.pdy = -20
-            #app.jumps -= 1
+            app.jumps -= 1
     if key == 'q':
         app.quit()
     if key == 't':
@@ -116,8 +114,10 @@ def story_onKeyHold(app, keys):
         app.pdx += 20
 
 def story_redrawAll(app):
-    drawLabel(f'{app.testAngle}', app.width / 2, app.height / 2 - 100)
-    drawRoom(app, app.currentRoom)
+    if app.currentRoom != 'BOSS':
+        drawRoom(app, app.currentRoom)
+    else:
+        drawBossRoom(app)
     drawCircle(app.px, app.py, app.pr, fill=app.pcolor)
     drawHealthBar(app)
 
@@ -131,6 +131,7 @@ def story_redrawAll(app):
     for bullet in app.playerBullets:
         if bullet.x > 0 and bullet.x < app.width and bullet.y > 0 and bullet.y < app.height:
             drawCircle(bullet.x, bullet.y, bullet.radius, fill=bullet.fill)
+
     for enemy in app.enemies:
         if isinstance(enemy, Ranger):
             drawTriangle(enemy.x, enemy.y, enemy.size, enemy.fill, 0)
@@ -318,6 +319,8 @@ def loadRoom(app):
     #Reset the current platforms everytime the character loads a new room
     app.currentPlatforms = []
     platformWidth = ((app.width - 100) / 3)
+    app.playerBullets = []
+    app.enemyBullets = []
     #Filter through and add all platforms to a list containing the top right and bottom left corner of all the platforms
     for i in range(2):
         for j in range(3):
@@ -408,6 +411,7 @@ def movePlayer(app):
         platform = platformCollision[1]
         if app.pdy > 0 and futurePlayerBottom >= platform[1] and currentPlayerBottom < platform[1]:
             app.isFalling = False
+            app.jumps = 2
             app.pdy = 0
             app.py = platform[1] - app.pr
             move(app)
@@ -636,10 +640,32 @@ def drawTriangle(centerX, centerY, side, fill, angle, border=None):
 #         drawTriangle(centerX, topY + height, nSL, 'gray', angle + 180, 'black')
 #         drawTriangle(centerX, top)
 
+def loadBossRoom(app):
+    app.enemies = []
+    app.currentPlatforms = []
+    platformWidth = 100
+    app.playerBullets = []
+    app.enemyBullets = []
+    app.currentRoom = None
+
+    app.px = app.width / 2
+    app.py = app.floorPlatformY - app.pr
+    app.pdy = 0
+    app.pdx = 0
+
+
+def drawBossRoom(app):
+    drawRect(0, 0, 50, app.height)
+    drawRect(0, 0, app.width, 50)
+    drawRect(app.width - 50, 0, app.width, app.height)
+    drawRect(0, app.height - 50, app.width, app.height)
+
+
 
 def drawHeart(topLeftX, topLeftY, height, width):
     drawPolygon(topLeftX, topLeftY, topLeftX + width / 4, topLeftY - height / 4, topLeftX + width / 2, topLeftY, topLeftX + (3 * (width / 4)), topLeftY - height / 4, topLeftX + width, topLeftY, topLeftX + width / 2, topLeftY + height * (3 / 4), fill='red') 
 
+#Not utilized at the moment either
 def findPlayer(app):
     for level in app.map:
         for room in level:
