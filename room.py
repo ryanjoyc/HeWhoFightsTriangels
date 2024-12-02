@@ -1,11 +1,13 @@
 class Room:
-    def __init__(self, player, enemies, map, doors):
-        self.player = player
+    def __init__(self, enemies, map, doors):
         self.enemies = enemies
         self.map = map
         self.doors = doors
 
 class BossRoom(Room):
-    def __init__(self, player, enemies, map, doors):
-        super().__init__(player, enemies, map, doors)
+    def __init__(self, enemies, map, doors):
+        self.enemies = []
+        self.map = []
+        self.doors = ''
         
+

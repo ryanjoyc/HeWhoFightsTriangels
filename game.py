@@ -68,6 +68,9 @@ def menu_redrawAll(app):
     drawRect(app.width / 2 - 100, app.height / 2 - 100, 200, 100, opacity=100, borderWidth=5, border='white')
     drawLabel('STORY', app.width / 2, app.height / 2 - 50, size=36, bold=True, fill='white')
 
+    drawRect(app.width / 2 - 100, app.height / 2 + 100, 200, 100, opacity=100, borderWidth=5, border='white')
+    drawLabel('Tutorial', app.width / 2, app.height / 2 + 150, size=36, bold=True, fill='white')
+
 def menu_onKeyPress(app, key):
     if key == 'q':
         app.quit()
@@ -75,6 +78,39 @@ def menu_onKeyPress(app, key):
 def menu_onMousePress(app, mouseX, mouseY):
     if (app.width / 2 - 100 <= mouseX and mouseX <= app.width / 2 + 100) and (app.height / 2 - 100 <= mouseY and mouseY <= app.height / 2 ):
         setActiveScreen('story')
+    if (app.width / 2 - 100 <= mouseX and mouseX <= app.width / 2 + 100) and (app.height / 2 + 100 <= mouseY and mouseY <= app.height / 2 + 200):
+        setActiveScreen('tutorial')
+    
+def tutorial_onScreenActivate(app):
+    app.background = 'black'
+
+def tutorial_redrawAll(app):
+    drawLabel('HOW TO PLAY', app.width / 2, 100, bold=True, fill='white', size=48)
+    
+    drawLabel('Movement:', 150, 200, italic=True, fill='white', size=36)
+    drawLabel('To move the character, use A to go left, D to go right, and space to jump! Due to your spherical and circular properties, you can', 300, 200, fill='white', size=24, align='left')
+    drawLabel('double jump too. You can jump up through the different platforms and land on them to refresh your jumps. To descend a platform, ', 300, 230, fill='white', size=24, align='left')
+    drawLabel('simply press S while standing on one. Jump into the red or green squares to move to adjacent rooms.', 300, 260, fill='white', size=24, align='left')
+
+    drawLabel('Combat:', 150, 350, italic=True, fill='white', size=36)
+    drawLabel('To shoot, simply click and bullet will shoot to that point. Entering a room with a red door means there are enemies in that room. ', 300, 350, fill='white', size=24, align='left')
+    drawLabel('The enemies can spawn in various places throughout the room, so it might be smart to scout the room before jumping right in. Also, ', 300, 380, fill='white', size=24, align='left')
+    drawLabel('there are various different enemy types with different abilities, movements, and health so analyze and act accordingly.', 300, 410, fill='white', size=24, align='left')
+    drawLabel('You can see your health in the bottom left, and when you take damage you go temporarily invulnerable so escape while you can.', 300, 440, fill='white', size=24, align='left')
+
+    drawLabel('Objective:', 150, 540, italic=True, fill='white', size=36)
+    drawLabel('Clear all the rooms to unlock the final boss fight(still a work in progress) and try not to lose all three lives.', 300, 540, fill='white', size=24, align='left')
+
+    drawRect(app.width / 2 - 75, app.height - 150, 150, 100, opacity=100, borderWidth=5, border='white')
+    drawLabel('BACK', app.width / 2, app.height - 100, bold=True, fill='white', size=36)
+    
+def tutorial_onKeyPress(app, key):
+    if key == 'q':
+        app.quit()
+
+def tutorial_onMousePress(app, mouseX, mouseY):
+    if (app.width / 2 - 75 <= mouseX and mouseX <= app.width / 2 + 75) and (app.height - 150 <= mouseY and mouseY <= app.height - 50):
+        setActiveScreen('menu')
 
 def story_onScreenActivate(app):
     app.background = 'white'
@@ -88,9 +124,9 @@ def story_onKeyPress(app, key):
     if key == 'r':
         app.pr = 30
     if key == 'a':
-        app.pdx -= 100
+        app.pdx -= 150
     if key == 'd':
-        app.pdx += 100
+        app.pdx += 150
     if ((key == 'space') and app.isOnGround) or ((key == 'space') and app.jumps > 0):
         app.isOnGround = False
         if app.isFalling == False:
@@ -246,9 +282,9 @@ def story_onStep(app):
 
 # Can possible add a level variable that will incrementally increase the number of enemies in each room
 def createMap(app):
-    map = [[Room(False, generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '0011'), Room(False, generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '1011'), Room(False, generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '1001')],
-           [Room(False, generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '0111'), Room(False, generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '1111'), Room(False, generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '1101')],
-           [Room(False, generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '0110'), Room(False, [], createRoom(), '1110'),                       Room(False, generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '1100')]]
+    map = [[Room(generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '0011'), Room(generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '1011'), Room(generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '1001')],
+           [Room(generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '0111'), Room(generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '1111'), Room(generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '1101')],
+           [Room(generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '0110'), Room([], createRoom(), '1110'),                                           Room(generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '1100')]]
     return map
 
 def createRoom():
@@ -664,12 +700,5 @@ def drawBossRoom(app):
 
 def drawHeart(topLeftX, topLeftY, height, width):
     drawPolygon(topLeftX, topLeftY, topLeftX + width / 4, topLeftY - height / 4, topLeftX + width / 2, topLeftY, topLeftX + (3 * (width / 4)), topLeftY - height / 4, topLeftX + width, topLeftY, topLeftX + width / 2, topLeftY + height * (3 / 4), fill='red') 
-
-#Not utilized at the moment either
-def findPlayer(app):
-    for level in app.map:
-        for room in level:
-            if room.player == True:
-                app.currentRoom = room
 
 cmu_graphics.runAppWithScreens(initialScreen='menu')
