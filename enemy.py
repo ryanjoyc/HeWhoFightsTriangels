@@ -40,6 +40,11 @@ class Ranger(Enemy):
         self.count = app.stepsPerSecond * 2
     def updateTarget(self, app):
         super().updateTarget(app)
+
+class Boss(Enemy):
+    def __init__(self, app, speed, size, health, fill):
+        super().__init__(app, speed, size, health, fill)
+
         
 
 

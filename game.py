@@ -4,6 +4,8 @@ from bullet import EnemyBullet
 from enemy import Enemy
 from enemy import Liner
 from enemy import Ranger
+from enemy import Boss
+from room import BossRoom
 from room import Room
 import math
 import random
@@ -116,8 +118,8 @@ def story_onScreenActivate(app):
     app.background = 'white'
 
 def story_onKeyPress(app, key):
-    # if key == '1':
-    #     loadBossRoom(app)
+    if key == '1':
+        loadBossRoom(BossRoom(1), app)
     if key == 's':
         app.pdy += 2
         app.isFalling = True
@@ -150,8 +152,8 @@ def story_onKeyHold(app, keys):
         app.pdx += 20
 
 def story_redrawAll(app):
-    if app.currentRoom != 'BOSS':
-        drawRoom(app, app.currentRoom)
+    if isinstance(app.currentRoom, BossRoom):
+        drawBossRoom(app)
     else:
         drawBossRoom(app)
     drawCircle(app.px, app.py, app.pr, fill=app.pcolor)
@@ -676,13 +678,20 @@ def drawTriangle(centerX, centerY, side, fill, angle, border=None):
 #         drawTriangle(centerX, topY + height, nSL, 'gray', angle + 180, 'black')
 #         drawTriangle(centerX, top)
 
-def loadBossRoom(app):
-    app.enemies = []
+def loadBossRoom(bossRoom, app):
+    #app.enemies = []
     app.currentPlatforms = []
-    platformWidth = 100
+    platformWidth = app.width / 10
+
+    for i in range(3):
+        for j in range(10):
+            if bossRoom.map[i][j] == '1':
+                app.currentPlatforms.append((app.width + 50 + (platformWidth * j), app.height - 250 - (100 * i), app.width + 50 + platformWidth + platformWidth * j, app.height - 250 - (100 * i) + 50 ))
+
+    app.currentDoors = []
     app.playerBullets = []
     app.enemyBullets = []
-    app.currentRoom = None
+    app.currentRoom = bossRoom
 
     app.px = app.width / 2
     app.py = app.floorPlatformY - app.pr
@@ -695,6 +704,9 @@ def drawBossRoom(app):
     drawRect(0, 0, app.width, 50)
     drawRect(app.width - 50, 0, app.width, app.height)
     drawRect(0, app.height - 50, app.width, app.height)
+
+    platformWidth = app.width / 10
+    
 
 
 
