@@ -42,14 +42,53 @@ class Ranger(Enemy):
         super().updateTarget(app)
 
 class Boss(Enemy):
-    def __init__(self, app, speed, size, health, fill):
-        super().__init__(app, speed, size, health, fill)
+    def __init__(self, app):
+        self.fill = 'blue'
+        self.originalFill = 'blue'
+        self.maxHealth = 50
+        self.health = 50
+        self.targetX = None
+        self.targetY = None
+        self.x = app.width / 2
+        self.y = app.height / 2
+        self.dx = 0
+        self.dy = 0
+        self.originalSize = app.pr
+        self.size = app.pr
+        self.speed = 0
+        self.angle = 0
+        self.count = 0
+        self.isAnimating = False
+        self.isImmune = False
+        self.isEnraged = False
+        self.enragedAttackCount = 0
+    
+    # Finds a random place to move that is not close to the player, this mode is supposed to be pretty passive
+    def getRandomTarget(self, app):
+        randomX = randomValue(50 + self.size, app.width - 50 - self.size)
+        randomY = randomValue(50 + self.size, app.height - 50 - self.size)
+        if getDistance(randomX, randomY, app.px, app.py) <= 250:
+            self.getRandomTarget(app)
+        else:
+            self.angle = calculateTheta(self.x, self.y, randomX, randomY)
+            self.speed = getDistance(self.x, self.y, randomX, randomY) / app.stepsPerSecond
+            self.dx = self.speed * math.cos(self.angle)
+            self.dy = self.speed * math.sin(self.angle)
 
-        
+    def targetPlayer(self, app):
+        self.targetX = app.px
+        self.targetY = app.py
 
+ 
 
 def calculateTheta(x, y, targetX, targetY):
     adjacent = targetX - x
     opposite = targetY - y
     theta = math.atan2(opposite, adjacent)
     return theta
+
+def randomValue(min, max):
+    return round(random.random() * (max - min)) + min
+
+def getDistance(x1, y1, x2, y2):
+    return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)

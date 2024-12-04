@@ -10,17 +10,13 @@ from room import Room
 import math
 import random
 
-def onAppStart(app):
-    app.width = 1700
-    app.height = 900
-    app.background = 'black'
-
-    # Test Variables
-    app.testAngle = 0
+def story_onScreenActivate(app):
+    app.background = 'white'
 
     #Bullet Variables
     app.playerBullets = []
     app.enemyBullets = []
+    app.currentShots = []
 
     #Enemy Variables
     app.enemies = []
@@ -37,11 +33,14 @@ def onAppStart(app):
     app.py = app.floorPlatformY - app.pr
     app.pdy = 0
     app.pdx = 0
+    app.jumpHeight = 0.3334 * app.stepsPerSecond
     app.playerImmune = False
     app.iFrameCount = 0
-
-    #Useful Player variables
     app.playerBottom = app.py + (app.pr)
+    app.jumps = 2
+    app.isOnGround = True
+    app.isFalling = False
+    app.gameOver = False
 
     #Map Variables
     app.map = createMap(app)
@@ -49,20 +48,19 @@ def onAppStart(app):
     app.currentDoors = []
     app.currentDoorColors = ''
 
-    #Important Global Variables
-    app.currentMouseX = None
-    app.currentMouseY = None
-    app.isOnGround = True
-    app.isFalling = False
-    app.jumps = 2
-
-    app.stepsPerSecond = 60
-
     # Find where the player is:
     app.mapCurrentY = 2
     app.mapCurrentX = 1
     app.currentRoom = app.map[app.mapCurrentY][app.mapCurrentX] # Just to make sure the first room loads properly for testing the function drawRoom()
     loadRoom(app)
+
+def onAppStart(app):
+    app.width = 1700
+    app.height = 900
+    app.background = 'black'
+
+    #Important Global Variables
+    app.stepsPerSecond = 60
 
 def menu_redrawAll(app):
     drawLabel('HeWhoFightsTriangle', app.width / 2, 100, bold=True, fill='white', size=48)
@@ -114,36 +112,36 @@ def tutorial_onMousePress(app, mouseX, mouseY):
     if (app.width / 2 - 75 <= mouseX and mouseX <= app.width / 2 + 75) and (app.height - 150 <= mouseY and mouseY <= app.height - 50):
         setActiveScreen('menu')
 
-def story_onScreenActivate(app):
-    app.background = 'white'
-
 def story_onKeyPress(app, key):
     if key == '1':
-        loadBossRoom(BossRoom(1), app)
+        loadBossRoom(BossRoom(), app)
+    if key == '2':
+        if isinstance(app.currentRoom, BossRoom):
+            boss = app.enemies[0]
+            boss.count = 0
+            boss.isEnraged = True
+            boss.isAnimating = True
     if key == 's':
         app.pdy += 2
         app.isFalling = True
-    if key == 'r':
-        app.pr = 30
     if key == 'a':
-        app.pdx -= 150
+        app.pdx -= 100
     if key == 'd':
-        app.pdx += 150
+        app.pdx += 100
     if ((key == 'space') and app.isOnGround) or ((key == 'space') and app.jumps > 0):
         app.isOnGround = False
         if app.isFalling == False:
             app.isFalling = True
-            app.jumps -= 1
+            #app.jumps -= 1
             app.py -= 1
             app.pdy -= 20
         else:
             app.pdy = -20
-            app.jumps -= 1
+            #app.jumps -= 1
     if key == 'q':
         app.quit()
     if key == 't':
         app.enemies.append(Ranger(app, 2, 200, 10, 'violet'))
-
 
 def story_onKeyHold(app, keys):
     if 'a' in keys:
@@ -152,15 +150,21 @@ def story_onKeyHold(app, keys):
         app.pdx += 20
 
 def story_redrawAll(app):
+    #Check whether to load boss room or regular room because boss room has different template and scale
     if isinstance(app.currentRoom, BossRoom):
         drawBossRoom(app)
+        boss = app.enemies[0]
+        if boss.isEnraged:
+            if boss.targetX != None and boss.targetY != None:
+                drawCircle(boss.targetX, boss.targetY, boss.size * 3, fill='crimson')
     else:
-        drawBossRoom(app)
+        drawRoom(app, app.currentRoom)
     drawCircle(app.px, app.py, app.pr, fill=app.pcolor)
     drawHealthBar(app)
 
-    # if app.currentMouseX != None and app.currentMouseY != None:
-    #     drawCursor(app)
+    if app.gameOver == True:
+        drawRect(app.width / 2 - 200, app.height / 2 - 100, 400, 200, border='red', borderWidth=5)
+        drawLabel('GAME OVER', app.width / 2, app.height / 2, fill='red', size=48)
 
     for bullet in app.enemyBullets:
         if bullet.x > 0 and bullet.x < app.width and bullet.y > 0 and bullet.y < app.height:
@@ -174,20 +178,38 @@ def story_redrawAll(app):
         if isinstance(enemy, Ranger):
             drawTriangle(enemy.x, enemy.y, enemy.size, enemy.fill, 0)
             #save if want to change drawing of ranger or different enemy types
+        elif isinstance(enemy, Boss):
+            drawCircle(enemy.x, enemy.y, enemy.size, fill=enemy.fill)
         else:
             drawTriangle(enemy.x, enemy.y, enemy.size, enemy.fill, enemy.rotateAngle)
 
 def story_onMousePress(app, mouseX, mouseY):
     app.playerBullets.append(Bullet(app.px, app.py, mouseX, mouseY, 25))
 
+    if isinstance(app.currentRoom, BossRoom):
+        app.currentShots.append((app.px, app.py))
+
+
 def story_onMouseMove(app, mouseX, mouseY):
     app.currentMouseX = mouseX
     app.currentMouseY = mouseY
 
-
 def story_onStep(app):
     #function to move the player
     movePlayer(app)
+
+    #Watch player health
+    # if app.playerHealth == 0:
+    #     app.gameOver = True
+    #     app.stepsPerSecond = 1
+    
+    # Stores all bullets the player shoots for 2 seconds, and then shoots the bullets back out
+    if isinstance(app.currentRoom, BossRoom):
+        boss = app.enemies[0]
+        if boss.count == 0:
+            for cord in app.currentShots:
+                app.enemyBullets.append(EnemyBullet(boss.x, boss.y, cord[0], cord[1], 15, 10))
+            app.currentShots = []
     
     #Mange player Iframes so they don't insta die``1
     if app.playerImmune == True:
@@ -258,6 +280,40 @@ def story_onStep(app):
                 enemy.x += enemy.dx
                 enemy.y += enemy.dy
                 enemy.count -= 1
+        elif isinstance(enemy, Boss):
+            if not enemy.isEnraged:
+                if enemy.health == 25:
+                    enemy.count = 0
+                    enemy.isEnraged = True
+                    enemy.isAnimating = True
+                if enemy.count == 0:
+                    enemy.getRandomTarget(app)
+                    enemy.x += enemy.dx
+                    enemy.y += enemy.dy
+                    enemy.count = 120
+                elif enemy.count == 60:
+                    enemy.getRandomTarget(app)
+                    enemy.x += enemy.dx
+                    enemy.y += enemy.dy
+                    enemy.count -= 1
+                else:
+                    enemy.count -= 1
+                    enemy.x += enemy.dx
+                    enemy.y += enemy.dy
+            if enemy.isEnraged:
+                if enemy.isAnimating == True:
+                    if enemy.size >= enemy.originalSize * 3:
+                        enemy.isAnimating = False
+                    if enemy.size < enemy.originalSize * 3:
+                        enemy.size += 1
+
+                elif enemy.count == 0:
+                    enemy.targetPlayer(app)
+                    enemy.count = 120
+                else:
+                    enemy.count -= 1
+
+
         else:
             enemy.updateTarget(app)
             enemy.x += enemy.dx
@@ -275,12 +331,20 @@ def story_onStep(app):
         if enemy.fill != enemy.originalFill:
             enemy.fill = enemy.originalFill
         for bullet in app.playerBullets:
-            if isCollidingWithEnemy(enemy, bullet):
-                enemy.health -= 1
-                enemy.fill = 'red'
-                app.playerBullets.remove(bullet)
-                if enemy.health == 0:
-                    app.enemies.remove(enemy)
+            if isinstance(enemy, Boss):
+                if circleCollidingCircle(bullet.x, bullet.y, bullet.radius, enemy.x, enemy.y, enemy.size):
+                    enemy.health -= 1
+                    enemy.fill = 'red'
+                    app.playerBullets.remove(bullet)
+                    if enemy.health == 0:
+                        app.enemies.remove(enemy)
+            else:
+                if isCollidingWithEnemy(enemy, bullet):
+                    enemy.health -= 1
+                    enemy.fill = 'red'
+                    app.playerBullets.remove(bullet)
+                    if enemy.health == 0:
+                        app.enemies.remove(enemy)
 
 # Can possible add a level variable that will incrementally increase the number of enemies in each room
 def createMap(app):
@@ -351,7 +415,7 @@ def drawRoom(app, room):
     for i in range(2):
         for j in range(3):
             if app.currentRoom.map[i][j] == '1':
-                drawRect(50 + platformWidth * j, 550 - 350 * i, platformWidth, 50)
+                drawRect(50 + platformWidth * j, 550 - 350 * i, platformWidth, 50, fill='brown')
 
 def loadRoom(app):
     #Reset the current platforms everytime the character loads a new room
@@ -413,13 +477,12 @@ def generateEnemies(enemyCount, app):
     for i in range(enemyCount):
         randomEnemyIndex = math.floor(random.random() * 3)
         if randomEnemyIndex == 0: #create basic enemy
-            enemies.append(Enemy(app, 7.5, 50, 5, 'purple'))
+            enemies.append(Enemy(app, 5, 50, 5, 'purple'))
         elif randomEnemyIndex == 1: #create line enemy
-            enemies.append(Liner(app, 15, 100, 10, 'green'))
+            enemies.append(Liner(app, 7.5, 100, 10, 'green'))
         elif randomEnemyIndex == 2: #create ranger enemy
             enemies.append(Ranger(app, 2, 200, 10, 'violet'))
     return enemies
-
 
 def randomEnemyCount(min, max):
     return rounded(random.random() * (max - min)) + min
@@ -505,7 +568,6 @@ def collisionWithPlatforms(app, futurePX, futurePY):
             return (True, platform)
     return (False, None)
 
-
 def fall(app):
     app.playerBottom = app.py + (app.pr)
     distanceToGround = app.floorPlatformY - app.playerBottom
@@ -570,8 +632,7 @@ def circleCollidingCircle(x1, y1, r1, x2, y2, r2):
         return True
     else:
         return False
-     
-    
+      
 # This is a function that's job is simple, but it's process is somewhat hard to understand intuitively. I want to thank again ChatGPT for helping me come up with it.
 def playerIntersectingRectangle(cx, cy, r, x1, y1, x2, y2):
   
@@ -665,22 +726,12 @@ def drawTriangle(centerX, centerY, side, fill, angle, border=None):
     elif border != None:
         drawPolygon(centerX - side / 2, centerY - height / 2, centerX + side / 2, centerY - height / 2, centerX, centerY + height / 2, fill=fill, rotateAngle=angle, border=border, borderWidth=2)
 
-
-# def drawSuperTriangle(centerX, topY, side, level, fill, angle):
-#     nSL = side / 2 # nSL stands for new side length, just makes code easier to read and intuitively understand
-#     height = (nSL * math.sqrt(3) / 2)
-#     drawCircle(centerX, topY, 5)
-#     # if angle > 180:
-#     #     realAngle = 180 - (angle % 180)
-#     if level == 0:
-#         drawTriangle(centerX - nSL / 2, topY + height / 2, nSL, 'gray', angle, 'black')
-#         drawTriangle(centerX + nSL / 2, topY + height / 2, nSL, 'gray', angle, 'black')
-#         drawTriangle(centerX, topY + height, nSL, 'gray', angle + 180, 'black')
-#         drawTriangle(centerX, top)
-
 def loadBossRoom(bossRoom, app):
-    #app.enemies = []
+    app.background = gradient('gray', 'white')
+    app.currentRoom = bossRoom
+    app.enemies = [Boss(app)]
     app.currentPlatforms = []
+    app.recentShots = []
     platformWidth = app.width / 10
 
     for i in range(3):
@@ -691,24 +742,30 @@ def loadBossRoom(bossRoom, app):
     app.currentDoors = []
     app.playerBullets = []
     app.enemyBullets = []
-    app.currentRoom = bossRoom
 
     app.px = app.width / 2
+    app.pr = 30
     app.py = app.floorPlatformY - app.pr
     app.pdy = 0
     app.pdx = 0
-
 
 def drawBossRoom(app):
     drawRect(0, 0, 50, app.height)
     drawRect(0, 0, app.width, 50)
     drawRect(app.width - 50, 0, app.width, app.height)
     drawRect(0, app.height - 50, app.width, app.height)
+    drawBossHealthBar(app)
 
     platformWidth = app.width / 10
-    
 
-
+def drawBossHealthBar(app):
+    boss = app.enemies[0]
+    drawRect(app.width / 2 - 200, 10, 400, 30, fill='lightGray')
+    drawRect(app.width / 2 - 200, 10, (boss.health) * (400 / boss.maxHealth), 30, fill=gradient('crimson', 'darkRed'))
+    drawRect(app.width / 2 - 150, 40, 300, 40, fill='black')
+    drawRect(app.width / 2 - 145, 44, 290, 32, fill='gray')
+    drawLabel('You?', app.width / 2, 60, fill='black', bold=True, italic=True, size=36)
+    drawLabel(f'{boss.health}', app.width / 2, 25, size=24, bold=True)
 
 def drawHeart(topLeftX, topLeftY, height, width):
     drawPolygon(topLeftX, topLeftY, topLeftX + width / 4, topLeftY - height / 4, topLeftX + width / 2, topLeftY, topLeftX + (3 * (width / 4)), topLeftY - height / 4, topLeftX + width, topLeftY, topLeftX + width / 2, topLeftY + height * (3 / 4), fill='red') 
