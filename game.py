@@ -16,6 +16,8 @@ def story_onScreenActivate(app):
     #Bullet Variables
     app.playerBullets = []
     app.enemyBullets = []
+    app.lightningBullets = []
+    app.lightningHitbox = []
     app.currentShots = []
 
     #Enemy Variables
@@ -152,11 +154,14 @@ def story_onKeyHold(app, keys):
 def story_redrawAll(app):
     #Check whether to load boss room or regular room because boss room has different template and scale
     if isinstance(app.currentRoom, BossRoom):
+        print(app.stepsPerSecond)
         drawBossRoom(app)
         boss = app.enemies[0]
         if boss.isEnraged:
             if boss.targetX != None and boss.targetY != None:
-                drawCircle(boss.targetX, boss.targetY, boss.size * 3, fill='crimson')
+                for i in range(len(app.lightningBullets)):
+                    for j in range(1, len(app.lightningBullets[i])):
+                        drawLine(app.lightningBullets[i][j-1][0], app.lightningBullets[i][j-1][1], app.lightningBullets[i][j][0], app.lightningBullets[i][j][1], fill='mediumSlateBlue')
     else:
         drawRoom(app, app.currentRoom)
     drawCircle(app.px, app.py, app.pr, fill=app.pcolor)
@@ -286,6 +291,7 @@ def story_onStep(app):
                     enemy.count = 0
                     enemy.isEnraged = True
                     enemy.isAnimating = True
+                    enemy.targetPlayer(app)
                 if enemy.count == 0:
                     enemy.getRandomTarget(app)
                     enemy.x += enemy.dx
@@ -302,18 +308,35 @@ def story_onStep(app):
                     enemy.y += enemy.dy
             if enemy.isEnraged:
                 if enemy.isAnimating == True:
-                    if enemy.size >= enemy.originalSize * 3:
+                    if enemy.size >= enemy.originalSize * 1.75:
                         enemy.isAnimating = False
-                    if enemy.size < enemy.originalSize * 3:
+                    if enemy.size < enemy.originalSize * 1.75:
                         enemy.size += 1
-
                 elif enemy.count == 0:
+                    app.lightningBullets = []
+                    app.lightningHitbox = None
                     enemy.targetPlayer(app)
+                    for i in range(5):
+                        distance = getDistance(enemy.x, enemy.y, enemy.targetX, enemy.targetY)
+                        angle = calculateTheta(enemy.x, enemy.y, enemy.targetX, enemy.targetY)
+                        dx = math.cos(angle) * (distance / 15)
+                        dy = math.sin(angle) * (distance / 15)
+                        if app.lightningHitbox == None:
+                            app.lightningHitbox = ((enemy.x + dx, enemy.y), (enemy.y + dy, enemy.x), (enemy.targetX - dx, enemy.targetY), (enemy.targetX, enemy.targetY - dy))
+                        app.lightningBullets.append(generateLightningPoints(boss.x, boss.y, boss.targetX, boss.targetY, 15))
                     enemy.count = 120
+                elif enemy.count == 115:
+                    app.lightningBullets = []
+                    for i in range(5):
+                        app.lightningBullets.append(generateLightningPoints(boss.x, boss.y, boss.targetX, boss.targetY, 15))
+                    enemy.count -= 1
+                elif enemy.count == 110:
+                    app.lightningBullets = []
+                    for i in range(5):
+                        app.lightningBullets.append(generateLightningPoints(boss.x, boss.y, boss.targetX, boss.targetY, 15))
+                    enemy.count -= 1
                 else:
                     enemy.count -= 1
-
-
         else:
             enemy.updateTarget(app)
             enemy.x += enemy.dx
@@ -691,6 +714,25 @@ def isCollidingWithEnemy(enemy, bullet):
     # If it doesn't collide with any of the points or lines, it isn't colliding, thus it is false
     return False
 
+def isCollidingWithLightning(lightningHitbox, app):
+
+    #Just put the points in a list for simple and easy iteration
+    points = [lightningHitbox[0], lightningHitbox[1], lightningHitbox[2], lightningHitbox[3]]
+    
+    # Check collision with vertices
+    for point in points:
+        if getDistance(app.px, app.py, point[0], point[1]) <= app.pr:
+            return True
+    
+    # Check collision with edges, which are just the three different points I used to draw the triangle
+    edges = [(x1, y1, x2, y2), (x2, y2, x3, y3), (x3, y3, x1, y1)]
+    for edge in edges:
+        if pointToSegmentDistance(app.px, app.py, edge[0], edge[1], edge[2], edge[3]) <= app.pr:
+            return True
+    
+    # If it doesn't collide with any of the points or lines, it isn't colliding, thus it is false
+    return False
+
 def isCollidingWithPlayer(enemy, app):
     
     # Define triangle points
@@ -758,6 +800,40 @@ def drawBossRoom(app):
 
     platformWidth = app.width / 10
 
+def generateLightningPoints(startX, startY, targetX, targetY, totalPoints):
+    return generateLightningPointsHelper(startX, startY, startX, startY, targetX, targetY, totalPoints, totalPoints, [])
+
+def generateLightningPointsHelper(startX, startY, currentX, currentY, targetX, targetY, totalPoints, currentPoints, cords):
+    # If there are no more points to draw, return the coordinates of the points
+    if currentPoints == 0:
+        cords.append((targetX, targetY))
+        return cords
+    
+    # recursive case is a lil bit trickier
+    else:
+        cords.append((currentX, currentY))
+
+        distance = getDistance(startX, startY, targetX, targetY)
+        angle = calculateTheta(startX, startY, targetX, targetY)
+        dx = math.cos(angle) * (distance / totalPoints)
+        dy = math.sin(angle) * (distance / totalPoints)
+
+        minYThreshold = startY + (dy * (totalPoints - currentPoints))
+        minXThreshold = startX + (dx * (totalPoints - currentPoints))
+
+        if abs(dx) < 30:
+            currentX = minXThreshold + ((random.random() * 60 - 30) * 3)
+        else:
+            currentX = minXThreshold + (random.random() * dx * 3)
+        if abs(dy) < 30:
+            currentY = minYThreshold + ((random.random() * 60 - 30) * 3)
+        else:
+            currentY = minYThreshold + (random.random() * dy * 3)
+
+        return generateLightningPointsHelper(startX, startY, currentX, currentY, targetX, targetY, totalPoints, currentPoints - 1, cords)
+    
+
+
 def drawBossHealthBar(app):
     boss = app.enemies[0]
     drawRect(app.width / 2 - 200, 10, 400, 30, fill='lightGray')
@@ -769,5 +845,11 @@ def drawBossHealthBar(app):
 
 def drawHeart(topLeftX, topLeftY, height, width):
     drawPolygon(topLeftX, topLeftY, topLeftX + width / 4, topLeftY - height / 4, topLeftX + width / 2, topLeftY, topLeftX + (3 * (width / 4)), topLeftY - height / 4, topLeftX + width, topLeftY, topLeftX + width / 2, topLeftY + height * (3 / 4), fill='red') 
+
+def calculateTheta(x, y, targetX, targetY):
+    adjacent = targetX - x
+    opposite = targetY - y
+    theta = math.atan2(opposite, adjacent)
+    return theta
 
 cmu_graphics.runAppWithScreens(initialScreen='menu')
