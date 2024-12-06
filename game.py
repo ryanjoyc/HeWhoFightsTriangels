@@ -1,3 +1,5 @@
+# Ryan Joyce / ryanjoyc / 15-112-1A
+
 from cmu_graphics import *
 from bullet import Bullet
 from bullet import EnemyBullet
@@ -12,6 +14,7 @@ import random
 
 def story_onScreenActivate(app):
     app.background = 'white'
+    app.stepsPerSecond = 60
 
     #Bullet Variables
     app.playerBullets = []
@@ -49,23 +52,52 @@ def story_onScreenActivate(app):
     app.currentPlatforms = []
     app.currentDoors = []
     app.currentDoorColors = ''
+    app.screenFlashCount = 0
+    app.currentBackgroundColor = app.background
 
     # Find where the player is:
     app.mapCurrentY = 2
     app.mapCurrentX = 1
     app.currentRoom = app.map[app.mapCurrentY][app.mapCurrentX] # Just to make sure the first room loads properly for testing the function drawRoom()
+    app.allRoomsCleared = False
+    app.gameWon = False
+
     loadRoom(app)
 
 def onAppStart(app):
     app.width = 1700
     app.height = 900
     app.background = 'black'
+    app.currentBackgroundColor = app.background
 
     #Important Global Variables
     app.stepsPerSecond = 60
 
+def win_onScreenActivate(app):
+    app.background = 'black'
+    app.currentBackground = app.background
+
+def win_redrawAll(app):
+    drawRect(app.width / 2 - 300, app.height / 2 - 200, 600, 400, border='cyan', borderWidth=5)
+    drawLabel('YOU WON', app.width / 2, app.height / 2 - 100, fill='white', size=36, bold=True, italic=True)
+    drawLabel('and defeated your greatest enemy, yourself.', app.width / 2, app.height / 2 + 50, fill='white', size=24, italic=True)
+    drawRect(app.width / 2 - 150, app.height / 2 + 110, 300, 80, borderWidth=5, border='white')
+    drawLabel('Return to Menu', app.width / 2, app.height / 2 + 150, size=30, bold=True, fill='white')
+
+def win_onMousePress(app, mouseX, mouseY):
+    if (app.width / 2 - 150 <= mouseX and mouseX <= app.width / 2 + 150) and (app.height / 2 + 110 <= mouseY and mouseY <= app.height / 2 + 190):
+        setActiveScreen('menu')
+
+def win_onKeyPress(app, key):
+    if key == 'q':
+        app.quit()
+
+def menu_onScreenActivate(app):
+    app.background = 'black'
+
+# This function draws everything in the menu screen
 def menu_redrawAll(app):
-    drawLabel('HeWhoFightsTriangle', app.width / 2, 100, bold=True, fill='white', size=48)
+    drawLabel('HeWhoFightsTriangles', app.width / 2, 100, bold=True, fill='white', size=48)
 
     drawRect(app.width / 2 - 100, app.height / 2 - 100, 200, 100, opacity=100, borderWidth=5, border='white')
     drawLabel('STORY', app.width / 2, app.height / 2 - 50, size=36, bold=True, fill='white')
@@ -77,22 +109,24 @@ def menu_onKeyPress(app, key):
     if key == 'q':
         app.quit()
 
+# Checks if player clicked off to other screens
 def menu_onMousePress(app, mouseX, mouseY):
     if (app.width / 2 - 100 <= mouseX and mouseX <= app.width / 2 + 100) and (app.height / 2 - 100 <= mouseY and mouseY <= app.height / 2 ):
         setActiveScreen('story')
     if (app.width / 2 - 100 <= mouseX and mouseX <= app.width / 2 + 100) and (app.height / 2 + 100 <= mouseY and mouseY <= app.height / 2 + 200):
         setActiveScreen('tutorial')
-    
+
 def tutorial_onScreenActivate(app):
     app.background = 'black'
 
+# Draws all the text explaining how to play the game
 def tutorial_redrawAll(app):
     drawLabel('HOW TO PLAY', app.width / 2, 100, bold=True, fill='white', size=48)
     
     drawLabel('Movement:', 150, 200, italic=True, fill='white', size=36)
     drawLabel('To move the character, use A to go left, D to go right, and space to jump! Due to your spherical and circular properties, you can', 300, 200, fill='white', size=24, align='left')
     drawLabel('double jump too. You can jump up through the different platforms and land on them to refresh your jumps. To descend a platform, ', 300, 230, fill='white', size=24, align='left')
-    drawLabel('simply press S while standing on one. Jump into the red or green squares to move to adjacent rooms.', 300, 260, fill='white', size=24, align='left')
+    drawLabel('simply press S while standing on one. Jump into the red or green squares to move to adjacent rooms. Q to quit!', 300, 260, fill='white', size=24, align='left')
 
     drawLabel('Combat:', 150, 350, italic=True, fill='white', size=36)
     drawLabel('To shoot, simply click and bullet will shoot to that point. Entering a room with a red door means there are enemies in that room. ', 300, 350, fill='white', size=24, align='left')
@@ -114,37 +148,41 @@ def tutorial_onMousePress(app, mouseX, mouseY):
     if (app.width / 2 - 75 <= mouseX and mouseX <= app.width / 2 + 75) and (app.height - 150 <= mouseY and mouseY <= app.height - 50):
         setActiveScreen('menu')
 
+# Movement is controlled here
 def story_onKeyPress(app, key):
     if key == '1':
-        loadBossRoom(BossRoom(), app)
+        app.allRoomsCleared = True
     if key == '2':
-        if isinstance(app.currentRoom, BossRoom):
-            boss = app.enemies[0]
-            boss.count = 0
-            boss.isEnraged = True
-            boss.isAnimating = True
+        enemy = app.enemies[0]
+        enemy.x = app.width / 2
+        enemy.y = app.height / 2
+        enemy.count = 30
+        enemy.isEnraged = True
+        enemy.isAnimating = True
+        enemy.targetPlayer(app)
     if key == 's':
         app.pdy += 2
         app.isFalling = True
+    # A and D add and subtract to the change in x position variable app.pdx   
     if key == 'a':
         app.pdx -= 100
     if key == 'd':
         app.pdx += 100
+    # Will initiate a jump if certain conditions are met such as being on a platform or on the ground or has jumps left
     if ((key == 'space') and app.isOnGround) or ((key == 'space') and app.jumps > 0):
         app.isOnGround = False
         if app.isFalling == False:
             app.isFalling = True
-            #app.jumps -= 1
+            app.jumps -= 1
             app.py -= 1
             app.pdy -= 20
         else:
             app.pdy = -20
-            #app.jumps -= 1
+            app.jumps -= 1
     if key == 'q':
         app.quit()
-    if key == 't':
-        app.enemies.append(Ranger(app, 2, 200, 10, 'violet'))
 
+# Player can hold down the keys to move character horizontally as well
 def story_onKeyHold(app, keys):
     if 'a' in keys:
         app.pdx -= 20
@@ -152,71 +190,78 @@ def story_onKeyHold(app, keys):
         app.pdx += 20
 
 def story_redrawAll(app):
-    #Check whether to load boss room or regular room because boss room has different template and scale
-    if isinstance(app.currentRoom, BossRoom):
-        print(app.stepsPerSecond)
+    # Draws a regular room (the walls and doors and platforms) if not a boss room, but then draws BossRoom and Boss Mechanics if in a boss room
+    if isinstance(app.currentRoom, BossRoom) and not app.gameWon:
         drawBossRoom(app)
-        boss = app.enemies[0]
-        if boss.isEnraged:
-            if boss.targetX != None and boss.targetY != None:
-                for i in range(len(app.lightningBullets)):
-                    for j in range(1, len(app.lightningBullets[i])):
-                        drawLine(app.lightningBullets[i][j-1][0], app.lightningBullets[i][j-1][1], app.lightningBullets[i][j][0], app.lightningBullets[i][j][1], fill='mediumSlateBlue')
+        drawLightningMechanics(app)
     else:
         drawRoom(app, app.currentRoom)
+
+    # Draw the bullets and the enemies
+    drawBullets(app)
+    drawEnemies(app)
+
+    # Draws player and health bar
     drawCircle(app.px, app.py, app.pr, fill=app.pcolor)
     drawHealthBar(app)
 
-    if app.gameOver == True:
-        drawRect(app.width / 2 - 200, app.height / 2 - 100, 400, 200, border='red', borderWidth=5)
-        drawLabel('GAME OVER', app.width / 2, app.height / 2, fill='red', size=48)
+    # Draw the boss prompt if player clears all the rooms, allowing the player to face the final boss
+    drawBossPrompt(app)
 
-    for bullet in app.enemyBullets:
-        if bullet.x > 0 and bullet.x < app.width and bullet.y > 0 and bullet.y < app.height:
-            drawCircle(bullet.x, bullet.y, bullet.radius, fill=bullet.fill)
-
-    for bullet in app.playerBullets:
-        if bullet.x > 0 and bullet.x < app.width and bullet.y > 0 and bullet.y < app.height:
-            drawCircle(bullet.x, bullet.y, bullet.radius, fill=bullet.fill)
-
-    for enemy in app.enemies:
-        if isinstance(enemy, Ranger):
-            drawTriangle(enemy.x, enemy.y, enemy.size, enemy.fill, 0)
-            #save if want to change drawing of ranger or different enemy types
-        elif isinstance(enemy, Boss):
-            drawCircle(enemy.x, enemy.y, enemy.size, fill=enemy.fill)
-        else:
-            drawTriangle(enemy.x, enemy.y, enemy.size, enemy.fill, enemy.rotateAngle)
+    # Draws game over menu/prompt if the player dies
+    drawGameOverPrompt(app)
 
 def story_onMousePress(app, mouseX, mouseY):
+    # Adds the players bullet to the active bulelt list so it gets drawn and can now collide
     app.playerBullets.append(Bullet(app.px, app.py, mouseX, mouseY, 25))
 
+    # If in the boss room, saves the players coordinates so the boss can shoot back at where the player used to be
     if isinstance(app.currentRoom, BossRoom):
         app.currentShots.append((app.px, app.py))
-
-
-def story_onMouseMove(app, mouseX, mouseY):
-    app.currentMouseX = mouseX
-    app.currentMouseY = mouseY
+    
+    # If the boss pop up appears, allow the plater to load the boss room when they click continue
+    if app.allRoomsCleared:
+        if (app.width / 2 - 200 <= mouseX and mouseX <= app.width / 2 + 200) and (app.height / 2 + 100 <= mouseY and mouseY <= app.height / 2 + 200):
+            loadBossRoom(BossRoom(), app)
+    
+    # If the game over screen is up, allow the player to click return to menu
+    if app.gameOver:
+        if (app.width / 2 - 150 <= mouseX and mouseX <= app.width / 2 + 150) and (app.height / 2 + 50 <= mouseY and mouseY <= app.height / 2 + 150):
+            setActiveScreen('menu')
 
 def story_onStep(app):
     #function to move the player
     movePlayer(app)
 
     #Watch player health
-    # if app.playerHealth == 0:
-    #     app.gameOver = True
-    #     app.stepsPerSecond = 1
+    if app.playerHealth == 0:
+        app.gameOver = True
+        app.stepsPerSecond = 1
     
+    
+    #Flash the screen red when the player gets hit
+    damageAnimation(app)
+
     # Stores all bullets the player shoots for 2 seconds, and then shoots the bullets back out
     if isinstance(app.currentRoom, BossRoom):
         boss = app.enemies[0]
         if boss.count == 0:
+            # Boss shoots all bullets stored back at the player
             for cord in app.currentShots:
                 app.enemyBullets.append(EnemyBullet(boss.x, boss.y, cord[0], cord[1], 15, 10))
+            # Resets and starts storing new bullets for cycle
             app.currentShots = []
+        
+        # If boss is enraged, start checking if the player is colliding with the lightning
+        if boss.isEnraged:
+            if app.lightningHitbox != []:
+                if not app.playerImmune and isCollidingWithLightning(app.lightningHitbox, app):
+                    app.playerHealth -= 1
+                    app.background = 'crimson'
+                    app.playerImmune = True
+
     
-    #Mange player Iframes so they don't insta die``1
+    #Mange player Iframes so they don't insta die
     if app.playerImmune == True:
         app.pcolor = 'gray'
         if app.iFrameCount == app.stepsPerSecond * 2:
@@ -252,6 +297,7 @@ def story_onStep(app):
             if circleCollidingCircle(app.px, app.py, app.pr, bullet.x, bullet.y, bullet.radius) and app.playerImmune == False:
                 app.playerHealth -= 1
                 app.playerImmune = True
+                app.background = 'crimson'
         else:
             app.enemyBullets.remove(bullet)
 
@@ -275,20 +321,20 @@ def story_onStep(app):
             if enemy.count == 0:
                 app.enemyBullets.append(EnemyBullet(enemy.x, enemy.y, app.px, app.py, 10, 50))
                 enemy.count = app.stepsPerSecond * 2
-                #enemy.rotateAngle += 15
 
                 enemy.updateTarget(app)
                 enemy.x += enemy.dx
                 enemy.y += enemy.dy
             else:
-                #enemy.rotateAngle += 15
                 enemy.x += enemy.dx
                 enemy.y += enemy.dy
                 enemy.count -= 1
         elif isinstance(enemy, Boss):
             if not enemy.isEnraged:
-                if enemy.health == 25:
-                    enemy.count = 0
+                if enemy.health == 50:
+                    enemy.x = app.width / 2
+                    enemy.y = app.height / 2
+                    enemy.count = 30
                     enemy.isEnraged = True
                     enemy.isAnimating = True
                     enemy.targetPlayer(app)
@@ -314,16 +360,24 @@ def story_onStep(app):
                         enemy.size += 1
                 elif enemy.count == 0:
                     app.lightningBullets = []
-                    app.lightningHitbox = None
-                    enemy.targetPlayer(app)
+                    app.lightningHitbox = []
                     for i in range(5):
                         distance = getDistance(enemy.x, enemy.y, enemy.targetX, enemy.targetY)
                         angle = calculateTheta(enemy.x, enemy.y, enemy.targetX, enemy.targetY)
                         dx = math.cos(angle) * (distance / 15)
                         dy = math.sin(angle) * (distance / 15)
-                        if app.lightningHitbox == None:
-                            app.lightningHitbox = ((enemy.x + dx, enemy.y), (enemy.y + dy, enemy.x), (enemy.targetX - dx, enemy.targetY), (enemy.targetX, enemy.targetY - dy))
-                        app.lightningBullets.append(generateLightningPoints(boss.x, boss.y, boss.targetX, boss.targetY, 15))
+                        if app.lightningHitbox == []:
+                            if abs(dx) < 30:
+                                app.lightningHitbox.extend([(enemy.x + 90, enemy.y), (enemy.targetX - 90, enemy.targetY)])
+                            else:
+                                app.lightningHitbox.extend([(enemy.x + dx, enemy.y), (enemy.targetX - dx, enemy.targetY)])
+                            if abs(dy) < 30:
+                                app.lightningHitbox.insert(1, (enemy.x, enemy.y + 90))
+                                app.lightningHitbox.append((enemy.targetX, enemy.targetY - 90))
+                            else:
+                                app.lightningHitbox.insert(1, (enemy.x, enemy.y + 90))
+                                app.lightningHitbox.append((enemy.targetX, enemy.targetY - dy))
+                        app.lightningBullets.append(generateLightningPoints(enemy.x, enemy.y, enemy.targetX, enemy.targetY, 15))
                     enemy.count = 120
                 elif enemy.count == 115:
                     app.lightningBullets = []
@@ -334,6 +388,10 @@ def story_onStep(app):
                     app.lightningBullets = []
                     for i in range(5):
                         app.lightningBullets.append(generateLightningPoints(boss.x, boss.y, boss.targetX, boss.targetY, 15))
+                    enemy.count -= 1
+                elif enemy.count == 30:
+                    app.lightningBullets = []
+                    enemy.targetPlayer(app)
                     enemy.count -= 1
                 else:
                     enemy.count -= 1
@@ -348,6 +406,7 @@ def story_onStep(app):
             if isCollidingWithPlayer(enemy, app):
                 app.playerHealth -= 1
                 app.playerImmune = True
+                app.background = 'crimson'
             
         
         # Checks if the enemy is is contact with a bullet and then acts on them if so
@@ -357,6 +416,8 @@ def story_onStep(app):
             if isinstance(enemy, Boss):
                 if circleCollidingCircle(bullet.x, bullet.y, bullet.radius, enemy.x, enemy.y, enemy.size):
                     enemy.health -= 1
+                    if enemy.health == 0:
+                        setActiveScreen('win')
                     enemy.fill = 'red'
                     app.playerBullets.remove(bullet)
                     if enemy.health == 0:
@@ -369,7 +430,7 @@ def story_onStep(app):
                     if enemy.health == 0:
                         app.enemies.remove(enemy)
 
-# Can possible add a level variable that will incrementally increase the number of enemies in each room
+# Creates a map that is randomaly generated, except for the doors as the doors are always in the same place with various different room objects containing enemies, doors, and platforms
 def createMap(app):
     map = [[Room(generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '0011'), Room(generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '1011'), Room(generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '1001')],
            [Room(generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '0111'), Room(generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '1111'), Room(generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '1101')],
@@ -446,6 +507,10 @@ def loadRoom(app):
     platformWidth = ((app.width - 100) / 3)
     app.playerBullets = []
     app.enemyBullets = []
+
+    #Check to see how many rooms are cleared every time a new room is loaded
+    app.allRoomsCleared = roomsCleared(app)
+
     #Filter through and add all platforms to a list containing the top right and bottom left corner of all the platforms
     for i in range(2):
         for j in range(3):
@@ -725,10 +790,12 @@ def isCollidingWithLightning(lightningHitbox, app):
             return True
     
     # Check collision with edges, which are just the three different points I used to draw the triangle
-    edges = [(x1, y1, x2, y2), (x2, y2, x3, y3), (x3, y3, x1, y1)]
-    for edge in edges:
-        if pointToSegmentDistance(app.px, app.py, edge[0], edge[1], edge[2], edge[3]) <= app.pr:
-            return True
+    for point in points:
+        for otherPoint in points:
+            if point == otherPoint:
+                pass
+            if pointToSegmentDistance(app.px, app.py, point[0], point[1], otherPoint[0], otherPoint[1]) <= app.pr:
+                return True
     
     # If it doesn't collide with any of the points or lines, it isn't colliding, thus it is false
     return False
@@ -770,6 +837,7 @@ def drawTriangle(centerX, centerY, side, fill, angle, border=None):
 
 def loadBossRoom(bossRoom, app):
     app.background = gradient('gray', 'white')
+    app.currentBackgroundColor = app.background
     app.currentRoom = bossRoom
     app.enemies = [Boss(app)]
     app.currentPlatforms = []
@@ -832,7 +900,13 @@ def generateLightningPointsHelper(startX, startY, currentX, currentY, targetX, t
 
         return generateLightningPointsHelper(startX, startY, currentX, currentY, targetX, targetY, totalPoints, currentPoints - 1, cords)
     
-
+def drawBossPrompt(app):
+    if app.allRoomsCleared and not isinstance(app.currentRoom, BossRoom):
+        drawRect(app.width / 2 - 300, app.height / 2 - 300, 600, 600, fill=gradient('black', 'crimson'), borderWidth=10, border='black')
+        drawLabel('An ominous figure awaits,', app.width / 2, app.height / 2 - 100, size=36, bold=True, italic=True, fill='gainsboro')
+        drawLabel('but it reminds you of someone...', app.width / 2, app.height / 2 - 60, size=36, bold=True, italic=True, fill='gainsboro')
+        drawRect(app.width / 2 - 200, app.height / 2 + 100, 400, 100, fill=gradient('white', 'gray'), border='black', borderWidth=10)
+        drawLabel('Continue to your fate', app.width / 2, app.height / 2 + 150, size=30, fill='darkRed', bold=True)
 
 def drawBossHealthBar(app):
     boss = app.enemies[0]
@@ -846,10 +920,66 @@ def drawBossHealthBar(app):
 def drawHeart(topLeftX, topLeftY, height, width):
     drawPolygon(topLeftX, topLeftY, topLeftX + width / 4, topLeftY - height / 4, topLeftX + width / 2, topLeftY, topLeftX + (3 * (width / 4)), topLeftY - height / 4, topLeftX + width, topLeftY, topLeftX + width / 2, topLeftY + height * (3 / 4), fill='red') 
 
+def roomsCleared(app):
+    for floor in app.map:
+        for room in floor:
+            if room.enemies != []:
+                return False
+    return True
+
 def calculateTheta(x, y, targetX, targetY):
     adjacent = targetX - x
     opposite = targetY - y
     theta = math.atan2(opposite, adjacent)
     return theta
+
+def damageAnimation(app):
+    if app.background != app.currentBackgroundColor or app.screenFlashCount != 0:
+        if app.screenFlashCount == 20:
+            app.background = app.currentBackgroundColor
+            app.screenFlashCount = 0
+        elif app.screenFlashCount % 5 == 0:
+            app.background = app.currentBackgroundColor
+            app.screenFlashCount += 1
+        else:
+            app.background = 'crimson'
+            app.screenFlashCount += 1
+
+def drawLightningMechanics(app):
+    boss = app.enemies[0]
+    if boss.isEnraged:
+        if boss.targetX != None and boss.targetY != None:
+            if app.lightningBullets == []:
+                drawLine(boss.x, boss.y, boss.targetX, boss.targetY, fill='mediumSlateBlue', lineWidth=10)
+            elif app.lightningBullets != []:
+                for i in range(len(app.lightningBullets)):
+                    for j in range(1, len(app.lightningBullets[i])):
+                        drawLine(app.lightningBullets[i][j-1][0], app.lightningBullets[i][j-1][1], app.lightningBullets[i][j][0], app.lightningBullets[i][j][1], fill='mediumSlateBlue')
+            
+def drawGameOverPrompt(app):
+    if app.gameOver == True:
+        drawRect(app.width / 2 - 200, app.height / 2 - 300, 400, 600, border='red', borderWidth=5)
+        drawLabel('GAME OVER', app.width / 2, app.height / 2 - 200, fill='red', size=48)
+        drawRect(app.width / 2 - 150, app.height / 2 + 50, 300, 100, border='white', borderWidth=5, fill='black')
+        drawLabel('Exit to menu', app.width / 2, app.height / 2 + 100, fill='white', size=36, bold=True)
+
+def drawBullets(app):
+    for bullet in app.enemyBullets:
+        if bullet.x > 0 and bullet.x < app.width and bullet.y > 0 and bullet.y < app.height:
+            drawCircle(bullet.x, bullet.y, bullet.radius, fill=bullet.fill)
+
+    for bullet in app.playerBullets:
+        if bullet.x > 0 and bullet.x < app.width and bullet.y > 0 and bullet.y < app.height:
+            drawCircle(bullet.x, bullet.y, bullet.radius, fill=bullet.fill)
+
+def drawEnemies(app):
+    for enemy in app.enemies:
+        if isinstance(enemy, Ranger):
+            drawTriangle(enemy.x, enemy.y, enemy.size, enemy.fill, 0)
+            #save if want to change drawing of ranger or different enemy types
+        elif isinstance(enemy, Boss):
+            drawCircle(enemy.x, enemy.y, enemy.size, fill=enemy.fill)
+        else:
+            drawTriangle(enemy.x, enemy.y, enemy.size, enemy.fill, enemy.rotateAngle)
 
 cmu_graphics.runAppWithScreens(initialScreen='menu')

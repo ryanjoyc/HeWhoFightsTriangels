@@ -45,8 +45,8 @@ class Boss(Enemy):
     def __init__(self, app):
         self.fill = 'blue'
         self.originalFill = 'blue'
-        self.maxHealth = 50
-        self.health = 50
+        self.maxHealth = 75
+        self.health = 75
         self.targetX = None
         self.targetY = None
         self.x = app.width / 2
