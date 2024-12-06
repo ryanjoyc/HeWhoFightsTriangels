@@ -135,7 +135,7 @@ def tutorial_redrawAll(app):
     drawLabel('You can see your health in the bottom left, and when you take damage you go temporarily invulnerable so escape while you can.', 300, 440, fill='white', size=24, align='left')
 
     drawLabel('Objective:', 150, 540, italic=True, fill='white', size=36)
-    drawLabel('Clear all the rooms to unlock the final boss fight(still a work in progress) and try not to lose all three lives.', 300, 540, fill='white', size=24, align='left')
+    drawLabel('Clear all the rooms to unlock the final boss fight and try not to lose all three lives.', 300, 540, fill='white', size=24, align='left')
 
     drawRect(app.width / 2 - 75, app.height - 150, 150, 100, opacity=100, borderWidth=5, border='white')
     drawLabel('BACK', app.width / 2, app.height - 100, bold=True, fill='white', size=36)
@@ -152,14 +152,6 @@ def tutorial_onMousePress(app, mouseX, mouseY):
 def story_onKeyPress(app, key):
     if key == '1':
         app.allRoomsCleared = True
-    if key == '2':
-        enemy = app.enemies[0]
-        enemy.x = app.width / 2
-        enemy.y = app.height / 2
-        enemy.count = 30
-        enemy.isEnraged = True
-        enemy.isAnimating = True
-        enemy.targetPlayer(app)
     if key == 's':
         app.pdy += 2
         app.isFalling = True
