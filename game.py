@@ -233,7 +233,7 @@ def story_onStep(app):
     #function to move the player
     movePlayer(app)
 
-    #Watch player health
+    #Watch player health and end the game if they die
     if app.playerHealth == 0:
         app.gameOver = True
         app.stepsPerSecond = 1
@@ -242,193 +242,45 @@ def story_onStep(app):
     #Flash the screen red when the player gets hit
     damageAnimation(app)
 
-    # Stores all bullets the player shoots for 2 seconds, and then shoots the bullets back out
     if isinstance(app.currentRoom, BossRoom):
-        boss = app.enemies[0]
-        if boss.count == 0:
-            # Boss shoots all bullets stored back at the player
-            for cord in app.currentShots:
-                app.enemyBullets.append(EnemyBullet(boss.x, boss.y, cord[0], cord[1], 15, 10))
-            # Resets and starts storing new bullets for cycle
-            app.currentShots = []
-        
+        # Stores all bullets the player shoots for 2 seconds, and then shoots the bullets back out
+        bossShoot(app)
         # If boss is enraged, start checking if the player is colliding with the lightning
-        if boss.isEnraged:
-            if app.lightningHitbox != []:
-                if not app.playerImmune and isCollidingWithLightning(app.lightningHitbox, app):
-                    app.playerHealth -= 1
-                    app.background = 'crimson'
-                    app.playerImmune = True
+        lightningCollision(app)
 
-    
-    #Mange player Iframes so they don't insta die
-    if app.playerImmune == True:
-        app.pcolor = 'gray'
-        if app.iFrameCount == app.stepsPerSecond * 2:
-            app.playerImmune = False
-            app.iFrameCount = 0
-        app.iFrameCount += 1
+    # Mange player Iframes so they don't insta die
+    playerImmuneFrames(app)
 
-    #Check if the player is on the ground
-    if app.playerBottom >= app.height - 50:
-        app.isOnGround = True
-        app.isFalling = False
-        app.pdy = 0
-        app.jumps = 2
+    # Check if the player is on the ground and change the players current velocity values
+    updatePlayer(app)
 
-    # Change the players current velocity values
-    app.pdx = app.pdx - (app.pdx / 5)
-    if app.isFalling:
-        app.pdy += 1
-
-    #Check and update bullets
-    for bullet in app.playerBullets:
-        if bullet.x > 0 and bullet.x < app.width and bullet.y > 0 and bullet.y < app.height:
-            bullet.x += bullet.dx
-            bullet.y += bullet.dy
-        else:
-            app.playerBullets.remove(bullet)
-    
-    #Check and update enemy bullets
-    for bullet in app.enemyBullets:
-        if bullet.x > 0 and bullet.x < app.width and bullet.y > 0 and bullet.y < app.height:
-            bullet.x += bullet.dx
-            bullet.y += bullet.dy
-            if circleCollidingCircle(app.px, app.py, app.pr, bullet.x, bullet.y, bullet.radius) and app.playerImmune == False:
-                app.playerHealth -= 1
-                app.playerImmune = True
-                app.background = 'crimson'
-        else:
-            app.enemyBullets.remove(bullet)
+    # Check if player's bullets are on screen and if so update their location, if not remove them to save memory
+    updatePlayerBullets(app)
+    # Check and update enemy bullets, also check if they are colliding with the player and if so damage the player
+    updateEnemyBullets(app)
 
     # manages the enemies in the game
     for enemy in app.enemies:
-        # Updates the enemies position and where the users position is
+        # Goes through each enemy and does different actions based on the type of enemy
         if isinstance(enemy, Liner):
-            if enemy.count == 0:
-                enemy.count = 60
-                enemy.updateTarget(app)
-                enemy.x += enemy.dx
-                enemy.y += enemy.dy
-                enemy.rotateAngle = math.degrees(enemy.angle)
-            elif enemy.count <= 15:
-                enemy.count -= 1
-            else:
-                enemy.x += enemy.dx
-                enemy.y += enemy.dy
-                enemy.count -= 1
+            linerActions(app, enemy)
         elif isinstance(enemy, Ranger):
-            if enemy.count == 0:
-                app.enemyBullets.append(EnemyBullet(enemy.x, enemy.y, app.px, app.py, 10, 50))
-                enemy.count = app.stepsPerSecond * 2
-
-                enemy.updateTarget(app)
-                enemy.x += enemy.dx
-                enemy.y += enemy.dy
-            else:
-                enemy.x += enemy.dx
-                enemy.y += enemy.dy
-                enemy.count -= 1
+            rangerActions(app, enemy)
         elif isinstance(enemy, Boss):
-            if not enemy.isEnraged:
-                if enemy.health == 50:
-                    enemy.x = app.width / 2
-                    enemy.y = app.height / 2
-                    enemy.count = 30
-                    enemy.isEnraged = True
-                    enemy.isAnimating = True
-                    enemy.targetPlayer(app)
-                if enemy.count == 0:
-                    enemy.getRandomTarget(app)
-                    enemy.x += enemy.dx
-                    enemy.y += enemy.dy
-                    enemy.count = 120
-                elif enemy.count == 60:
-                    enemy.getRandomTarget(app)
-                    enemy.x += enemy.dx
-                    enemy.y += enemy.dy
-                    enemy.count -= 1
-                else:
-                    enemy.count -= 1
-                    enemy.x += enemy.dx
-                    enemy.y += enemy.dy
-            if enemy.isEnraged:
-                if enemy.isAnimating == True:
-                    if enemy.size >= enemy.originalSize * 1.75:
-                        enemy.isAnimating = False
-                    if enemy.size < enemy.originalSize * 1.75:
-                        enemy.size += 1
-                elif enemy.count == 0:
-                    app.lightningBullets = []
-                    app.lightningHitbox = []
-                    for i in range(5):
-                        distance = getDistance(enemy.x, enemy.y, enemy.targetX, enemy.targetY)
-                        angle = calculateTheta(enemy.x, enemy.y, enemy.targetX, enemy.targetY)
-                        dx = math.cos(angle) * (distance / 15)
-                        dy = math.sin(angle) * (distance / 15)
-                        if app.lightningHitbox == []:
-                            if abs(dx) < 30:
-                                app.lightningHitbox.extend([(enemy.x + 90, enemy.y), (enemy.targetX - 90, enemy.targetY)])
-                            else:
-                                app.lightningHitbox.extend([(enemy.x + dx, enemy.y), (enemy.targetX - dx, enemy.targetY)])
-                            if abs(dy) < 30:
-                                app.lightningHitbox.insert(1, (enemy.x, enemy.y + 90))
-                                app.lightningHitbox.append((enemy.targetX, enemy.targetY - 90))
-                            else:
-                                app.lightningHitbox.insert(1, (enemy.x, enemy.y + 90))
-                                app.lightningHitbox.append((enemy.targetX, enemy.targetY - dy))
-                        app.lightningBullets.append(generateLightningPoints(enemy.x, enemy.y, enemy.targetX, enemy.targetY, 15))
-                    enemy.count = 120
-                elif enemy.count == 115:
-                    app.lightningBullets = []
-                    for i in range(5):
-                        app.lightningBullets.append(generateLightningPoints(boss.x, boss.y, boss.targetX, boss.targetY, 15))
-                    enemy.count -= 1
-                elif enemy.count == 110:
-                    app.lightningBullets = []
-                    for i in range(5):
-                        app.lightningBullets.append(generateLightningPoints(boss.x, boss.y, boss.targetX, boss.targetY, 15))
-                    enemy.count -= 1
-                elif enemy.count == 30:
-                    app.lightningBullets = []
-                    enemy.targetPlayer(app)
-                    enemy.count -= 1
-                else:
-                    enemy.count -= 1
+            bossActions(app, enemy)
         else:
-            enemy.updateTarget(app)
-            enemy.x += enemy.dx
-            enemy.y += enemy.dy
-            enemy.rotateAngle += 15
+            seekerActions(app, enemy)
 
-        #Checks if enemy is in contact with player
-        if app.playerImmune == False:
-            if isCollidingWithPlayer(enemy, app):
-                app.playerHealth -= 1
-                app.playerImmune = True
-                app.background = 'crimson'
+        # Checks if enemy is in contact with player
+        enemyCollisionWithPlayer(app, enemy)
             
-        
-        # Checks if the enemy is is contact with a bullet and then acts on them if so
+        # Checks if enemy's color isn't original, usually when it just got shot, and turns it back to its original color
         if enemy.fill != enemy.originalFill:
             enemy.fill = enemy.originalFill
+        
+        # Checks if any of the player's bullets hit any enemies
         for bullet in app.playerBullets:
-            if isinstance(enemy, Boss):
-                if circleCollidingCircle(bullet.x, bullet.y, bullet.radius, enemy.x, enemy.y, enemy.size):
-                    enemy.health -= 1
-                    if enemy.health == 0:
-                        setActiveScreen('win')
-                    enemy.fill = 'red'
-                    app.playerBullets.remove(bullet)
-                    if enemy.health == 0:
-                        app.enemies.remove(enemy)
-            else:
-                if isCollidingWithEnemy(enemy, bullet):
-                    enemy.health -= 1
-                    enemy.fill = 'red'
-                    app.playerBullets.remove(bullet)
-                    if enemy.health == 0:
-                        app.enemies.remove(enemy)
+            enemyCollisionWithBullet(app, enemy, bullet)          
 
 # Creates a map that is randomaly generated, except for the doors as the doors are always in the same place with various different room objects containing enemies, doors, and platforms
 def createMap(app):
@@ -437,6 +289,7 @@ def createMap(app):
            [Room(generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '0110'), Room([], createRoom(), '1110'),                                           Room(generateEnemies(randomEnemyCount(3, 5), app), createRoom(), '1100')]]
     return map
 
+# Creates a list of two strings of length 3, each with 2 ones and 1 zero, with the 1s denoting where the platforms are and the 0 where the gap in the platforms is
 def createRoom():
     room = []
     for i in range(2):
@@ -450,11 +303,15 @@ def createRoom():
         room.append(floor)
     return room
 
+# Draws a room based on the room variables such as the doors, door colors, and platforms based on their respective global and Room variables
 def drawRoom(app, room):
+    # These locals make life a lot easier and more intuitive to read in this function
     halfHeight = app.height / 2
     halfWidth = app.width / 2
     platformWidth = ((app.width - 100) / 3)
 
+    # Goes through the room variable Room.doors which indicates where the doors are in the room and either draws a wall or a door
+    # app.currentDoorColors loops through to see if there are enemies and colors the doors based on if there are or are not
     if int(room.doors[0]) == 1:
         drawRect(0, 0, 50, halfHeight - 50)
         if app.currentDoorColors[0] == '0':
@@ -495,38 +352,41 @@ def drawRoom(app, room):
     else:
         drawRect(0, app.height - 50, app.width, app.height)
 
-
+    # loops through the variable that holds the platforms 'map' and draws them if there is a '1' there
     for i in range(2):
         for j in range(3):
             if app.currentRoom.map[i][j] == '1':
                 drawRect(50 + platformWidth * j, 550 - 350 * i, platformWidth, 50, fill='brown')
 
+# Loads all globals variables and updates them everytime the player enters a new room so that the other functions no what to base it off of
 def loadRoom(app):
-    #Reset the current platforms everytime the character loads a new room
+    #Reset platforms and bullets as they logically don't transfer between rooms, platformWidth variable makes programming some of this stuff easier to see
     app.currentPlatforms = []
     platformWidth = ((app.width - 100) / 3)
     app.playerBullets = []
     app.enemyBullets = []
 
-    #Check to see how many rooms are cleared every time a new room is loaded
+    #Check to see if all rooms are cleared to know if the game should put up the boss prompt
     app.allRoomsCleared = roomsCleared(app)
 
-    #Filter through and add all platforms to a list containing the top right and bottom left corner of all the platforms
+    #Filter through and add all platforms to a list containing the top right and bottom left (makes it easier for collision) corner of all the platforms
     for i in range(2):
         for j in range(3):
             if app.currentRoom.map[i][j] == '1':
                 app.currentPlatforms.append((50 + platformWidth * j, 550 - 350 * i, 50 + platformWidth * j + platformWidth, 550 - (350 * i) + 50)) # Convert to top left and bottom right
 
-    #Spawn in the enmies
+    #Spawn in the enmies (set them to the enemies in the current room)
     app.enemies = app.currentRoom.enemies
 
-    #Add all door paramters into the a list containg the corners of all doors in the currently loaded room
+    # Create convenient local variables and erase old variables from previously loaded rooms
     halfHeight = app.height / 2
     halfWidth = app.width / 2
     doors = app.currentRoom.doors
     app.currentDoors = []
     app.currentDoorColors = ''
 
+    # Adds the current door coordinates if their is a door, so game can check collision with doors easier
+    # Also if there is a door, checks if there are enemies in the room in that corresponding direction, so it doesn't cause a index out of range error
     if int(doors[0]) == 1:
         app.currentDoors.append((0, halfHeight - 50, 50, halfHeight + 50))
         if app.map[app.mapCurrentY][app.mapCurrentX - 1].enemies == []:
@@ -560,10 +420,11 @@ def loadRoom(app):
     else:
         app.currentDoorColors += '1'
 
+# Generate the enemy objects to be added to the enemy list
 def generateEnemies(enemyCount, app):
     enemies = []
     for i in range(enemyCount):
-        randomEnemyIndex = math.floor(random.random() * 3)
+        randomEnemyIndex = math.floor(random.random() * 3) # Choose a random number so enemy type is different each time
         if randomEnemyIndex == 0: #create basic enemy
             enemies.append(Enemy(app, 5, 50, 5, 'purple'))
         elif randomEnemyIndex == 1: #create line enemy
@@ -572,18 +433,16 @@ def generateEnemies(enemyCount, app):
             enemies.append(Ranger(app, 2, 200, 10, 'violet'))
     return enemies
 
+# Choose a random number of enemies between the min and the max
 def randomEnemyCount(min, max):
     return rounded(random.random() * (max - min)) + min
 
-#Currently not in use
-def drawCursor(app):
-    #Change cursor later
-    drawCircle(app.currentMouseX, app.currentMouseY, 20, fill='white', border='black', borderWidth=1, opacity=0)
-
+# Draws hearts using draw polygon based on the number of health the player has left
 def drawHealthBar(app):
     for i in range(app.playerHealth):
         drawHeart(50 + 50 * i, app.height - 40, 30, 40)
 
+# Moves the player based on their dx and dy
 def movePlayer(app):
     # Variables that make some of the code below a little bit clearer
     futurePX = app.px + (app.pdx / 5)
@@ -593,24 +452,24 @@ def movePlayer(app):
     halfHeight = app.height / 2
     halfWidth = app.width / 2
 
-    # Make a collision object, that way we don't have to run function multiple times, will store a true or false so we can still easily check
+    # Make a collision object, that way we don't have to run function multiple times, will store a true or false so we can still easily check, as well as the coordinates of the platform
     platformCollision = collisionWithPlatforms(app, futurePX, futurePY)
     doorCollision = collisionWithDoors(app, futurePX, futurePY)
-    if platformCollision[0]:
-        platform = platformCollision[1]
-        if app.pdy > 0 and futurePlayerBottom >= platform[1] and currentPlayerBottom < platform[1]:
+    if platformCollision[0]: # If the player is colliding with a platform
+        platform = platformCollision[1] # Coordinates of top left and bottom right of the platform the player is colliding with
+        if app.pdy > 0 and futurePlayerBottom >= platform[1] and currentPlayerBottom < platform[1]: # If the player is falling down on a platform, then stop its dy and stop it from falling while treating platform like ground
             app.isFalling = False
             app.jumps = 2
             app.pdy = 0
             app.py = platform[1] - app.pr
             move(app)
-        elif app.pdy <= 0 and currentPlayerBottom > platform[1]:
+        elif app.pdy <= 0 and currentPlayerBottom > platform[1]: # If player is colliding with a platform but the bottom isn't above the top of the platform, don't do anything
             move(app)
             fall(app)
         else:
             fall(app)
             move(app)
-    elif doorCollision[0]:
+    elif doorCollision[0]: # If the player is colliding with a door
         #This gets the top left corner of the door and then checks it with all possible door positions to determine the next room the player is going to
         doorTopLeft = doorCollision[2]
         if doorTopLeft == (0, halfHeight - 50):
@@ -633,12 +492,25 @@ def movePlayer(app):
             app.py = 0 + 50 + app.pr
             app.currentRoom = app.map[app.mapCurrentY][app.mapCurrentX]
             loadRoom(app)
-    else:
-        app.isFalling = True
-        app.pcolor = 'blue'   
+    else: # if not hitting a platform just move normally
+        app.isFalling = True 
         fall(app)
         move(app)
-    
+
+# Update players dy and dx variables
+def updatePlayer(app):
+    # Check if the player is on the ground and if so stop from falling and refresh jumps
+    if app.playerBottom >= app.height - 50:
+        app.isOnGround = True
+        app.isFalling = False
+        app.pdy = 0
+        app.jumps = 2
+
+    # Change the players current velocity values
+    app.pdx = app.pdx - (app.pdx / 5)
+    if app.isFalling:
+        app.pdy += 1
+
 def collisionWithDoors(app, futurePX, futurePY):
     door = None
     for door in app.currentDoors:
@@ -656,6 +528,7 @@ def collisionWithPlatforms(app, futurePX, futurePY):
             return (True, platform)
     return (False, None)
 
+# Change the players position based on player's dy, manages collision with floor and ceiling
 def fall(app):
     app.playerBottom = app.py + (app.pr)
     distanceToGround = app.floorPlatformY - app.playerBottom
@@ -673,7 +546,7 @@ def fall(app):
 # Here is the move function, but we are also gonna incorporate the collision and registering those effects on movement here too
 def move(app):
     futurePX = app.px + (app.pdx / 5)
-    if isHittingBoundary(futurePX, app):
+    if isHittingBoundary(futurePX, app): # Checks if the player is hitting the left or right walls
         dx = 0
     else:
         app.px = futurePX
@@ -684,8 +557,7 @@ def isHittingBoundary(px, app):
     halfHeight = app.height / 2
     halfWidth = app.width / 2
     walls = []
-    # Similar process to drawing the walls, but I am re-using the code to extract the points for all the rectangles that are the walls
-    # This works at the moment, but might actually be bugged...
+    # Similar process to drawing the walls, but I am re-using the code to extract the points (top left and bottom right) for all the rectangles that are the walls
     if int(doors[0]) == 1:
         walls.append((0, 0, 50, halfHeight - 50))
         walls.append((0, halfHeight + 50, 50, app.height))
@@ -699,9 +571,6 @@ def isHittingBoundary(px, app):
         walls.append((app.width - 50, 0, app.width, app.height))
 
     # Now that we have all the points for the walls of the rectangle, we can check if the player intersects with any of them
-    # Side Notes : I thought that by extracting the walls of every room would be easier as the walls change every time the player moves a room
-    # This will also allow me to be more playful later on if I want to change the design of how the walls are lined...
-
     for wall in walls:
         if playerIntersectingRectangle(px, app.py, app.pr, wall[0], wall[1], wall[2], wall[3]):
             if app.pdx > 0:
@@ -712,7 +581,7 @@ def isHittingBoundary(px, app):
     
     return False
 
-#This function will be used to check collision between enemy and player
+#This function will be used to check collision between two circles
 def circleCollidingCircle(x1, y1, r1, x2, y2, r2):
     distance = getDistance(x1, y1, x2, y2)
     sumRadii = r1 + r2
@@ -737,6 +606,7 @@ def playerIntersectingRectangle(cx, cy, r, x1, y1, x2, y2):
 def getDistance(x1, y1, x2, y2):
     return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
 
+# Gets the distance from a circle to line segments, very important for checking collision between circle and the line segments of the traingle and even for boss lightning
 def pointToSegmentDistance(px, py, x1, y1, x2, y2):
     # Shortest distance from point (px, py) to the line segment (x1, y1) -> (x2, y2)
     lineLengthSQ = (x2 - x1)**2 + (y2 - y1)**2
@@ -752,6 +622,7 @@ def pointToSegmentDistance(px, py, x1, y1, x2, y2):
     projectionY = y1 + t * (y2 - y1)
     return getDistance(px, py, projectionX, projectionY)
 
+# Checks if a bullet is colliding with the enemy which are triangles
 def isCollidingWithEnemy(enemy, bullet):
     
     # Define triangle points
@@ -779,6 +650,7 @@ def isCollidingWithEnemy(enemy, bullet):
     # If it doesn't collide with any of the points or lines, it isn't colliding, thus it is false
     return False
 
+# Based on the boss position and the target position of lightning, draws a polygon and uses that as a hitbox
 def isCollidingWithLightning(lightningHitbox, app):
 
     #Just put the points in a list for simple and easy iteration
@@ -800,6 +672,7 @@ def isCollidingWithLightning(lightningHitbox, app):
     # If it doesn't collide with any of the points or lines, it isn't colliding, thus it is false
     return False
 
+# Similar to isCollidingWithEnemy, but just for the player
 def isCollidingWithPlayer(enemy, app):
     
     # Define triangle points
@@ -827,7 +700,7 @@ def isCollidingWithPlayer(enemy, app):
     # If it doesn't collide with any of the points or lines, it isn't colliding, thus it is false
     return False
 
-# Simple drawTriangle function that can take 
+# Simple drawTriangle function to draw the enemies
 def drawTriangle(centerX, centerY, side, fill, angle, border=None):
     height = (side * math.sqrt(3) / 2)
     if border == None:
@@ -835,6 +708,7 @@ def drawTriangle(centerX, centerY, side, fill, angle, border=None):
     elif border != None:
         drawPolygon(centerX - side / 2, centerY - height / 2, centerX + side / 2, centerY - height / 2, centerX, centerY + height / 2, fill=fill, rotateAngle=angle, border=border, borderWidth=2)
 
+# Like loadRoom, but specialized for the BossRoom
 def loadBossRoom(bossRoom, app):
     app.background = gradient('gray', 'white')
     app.currentBackgroundColor = app.background
@@ -842,12 +716,6 @@ def loadBossRoom(bossRoom, app):
     app.enemies = [Boss(app)]
     app.currentPlatforms = []
     app.recentShots = []
-    platformWidth = app.width / 10
-
-    for i in range(3):
-        for j in range(10):
-            if bossRoom.map[i][j] == '1':
-                app.currentPlatforms.append((app.width + 50 + (platformWidth * j), app.height - 250 - (100 * i), app.width + 50 + platformWidth + platformWidth * j, app.height - 250 - (100 * i) + 50 ))
 
     app.currentDoors = []
     app.playerBullets = []
@@ -859,6 +727,7 @@ def loadBossRoom(bossRoom, app):
     app.pdy = 0
     app.pdx = 0
 
+# Draws the special BossRoom
 def drawBossRoom(app):
     drawRect(0, 0, 50, app.height)
     drawRect(0, 0, app.width, 50)
@@ -866,29 +735,32 @@ def drawBossRoom(app):
     drawRect(0, app.height - 50, app.width, app.height)
     drawBossHealthBar(app)
 
-    platformWidth = app.width / 10
-
+# generates the points that will be used to draw the lightning
 def generateLightningPoints(startX, startY, targetX, targetY, totalPoints):
     return generateLightningPointsHelper(startX, startY, startX, startY, targetX, targetY, totalPoints, totalPoints, [])
 
+# Recursive function that creates all the points
 def generateLightningPointsHelper(startX, startY, currentX, currentY, targetX, targetY, totalPoints, currentPoints, cords):
     # If there are no more points to draw, return the coordinates of the points
     if currentPoints == 0:
         cords.append((targetX, targetY))
         return cords
     
-    # recursive case is a lil bit trickier
+    # Keeps drawing until all points are drawn
     else:
         cords.append((currentX, currentY))
 
+        # These variables keep the lightning on track
         distance = getDistance(startX, startY, targetX, targetY)
         angle = calculateTheta(startX, startY, targetX, targetY)
         dx = math.cos(angle) * (distance / totalPoints)
         dy = math.sin(angle) * (distance / totalPoints)
 
+        # Makes sure that the points keep travleing relativelely towards the player, or else some lightning could look really weird
         minYThreshold = startY + (dy * (totalPoints - currentPoints))
         minXThreshold = startX + (dx * (totalPoints - currentPoints))
-
+        
+        # If dx or dy is to small, some lightning becomes too straight, if that's the case just draws with fixed range
         if abs(dx) < 30:
             currentX = minXThreshold + ((random.random() * 60 - 30) * 3)
         else:
@@ -899,7 +771,8 @@ def generateLightningPointsHelper(startX, startY, currentX, currentY, targetX, t
             currentY = minYThreshold + (random.random() * dy * 3)
 
         return generateLightningPointsHelper(startX, startY, currentX, currentY, targetX, targetY, totalPoints, currentPoints - 1, cords)
-    
+
+# Draws the boss prompt where the player can click to start the boss 
 def drawBossPrompt(app):
     if app.allRoomsCleared and not isinstance(app.currentRoom, BossRoom):
         drawRect(app.width / 2 - 300, app.height / 2 - 300, 600, 600, fill=gradient('black', 'crimson'), borderWidth=10, border='black')
@@ -908,6 +781,7 @@ def drawBossPrompt(app):
         drawRect(app.width / 2 - 200, app.height / 2 + 100, 400, 100, fill=gradient('white', 'gray'), border='black', borderWidth=10)
         drawLabel('Continue to your fate', app.width / 2, app.height / 2 + 150, size=30, fill='darkRed', bold=True)
 
+# Draws the boss' health bar at the top of the boss room
 def drawBossHealthBar(app):
     boss = app.enemies[0]
     drawRect(app.width / 2 - 200, 10, 400, 30, fill='lightGray')
@@ -917,9 +791,31 @@ def drawBossHealthBar(app):
     drawLabel('You?', app.width / 2, 60, fill='black', bold=True, italic=True, size=36)
     drawLabel(f'{boss.health}', app.width / 2, 25, size=24, bold=True)
 
+# Shoots bullets at all the stored positions that the player used to be at
+def bossShoot(app):
+    boss = app.enemies[0]
+    if boss.count == 0:
+        # Boss shoots all bullets stored back at the player
+        for cord in app.currentShots:
+            app.enemyBullets.append(EnemyBullet(boss.x, boss.y, cord[0], cord[1], 15, 10))
+        # Resets and starts storing new bullets for cycle
+        app.currentShots = []
+
+# Check if the player is colliding with the lightningHitbox
+def lightningCollision(app):
+    boss = app.enemies[0]
+    if boss.isEnraged:
+            if app.lightningHitbox != []:
+                if not app.playerImmune and isCollidingWithLightning(app.lightningHitbox, app):
+                    app.playerHealth -= 1
+                    app.background = 'crimson'
+                    app.playerImmune = True
+
+# Helper function to just draw a heart, used in draw health bar
 def drawHeart(topLeftX, topLeftY, height, width):
     drawPolygon(topLeftX, topLeftY, topLeftX + width / 4, topLeftY - height / 4, topLeftX + width / 2, topLeftY, topLeftX + (3 * (width / 4)), topLeftY - height / 4, topLeftX + width, topLeftY, topLeftX + width / 2, topLeftY + height * (3 / 4), fill='red') 
 
+# Check if all the rooms were cleared
 def roomsCleared(app):
     for floor in app.map:
         for room in floor:
@@ -927,12 +823,14 @@ def roomsCleared(app):
                 return False
     return True
 
+# Simply calculates the angle between two points
 def calculateTheta(x, y, targetX, targetY):
     adjacent = targetX - x
     opposite = targetY - y
     theta = math.atan2(opposite, adjacent)
     return theta
 
+# Flashes the screen when the player takes damage
 def damageAnimation(app):
     if app.background != app.currentBackgroundColor or app.screenFlashCount != 0:
         if app.screenFlashCount == 20:
@@ -945,6 +843,7 @@ def damageAnimation(app):
             app.background = 'crimson'
             app.screenFlashCount += 1
 
+# Draw the line showing where the lightning will strike and draws the lightning
 def drawLightningMechanics(app):
     boss = app.enemies[0]
     if boss.isEnraged:
@@ -955,7 +854,7 @@ def drawLightningMechanics(app):
                 for i in range(len(app.lightningBullets)):
                     for j in range(1, len(app.lightningBullets[i])):
                         drawLine(app.lightningBullets[i][j-1][0], app.lightningBullets[i][j-1][1], app.lightningBullets[i][j][0], app.lightningBullets[i][j][1], fill='mediumSlateBlue')
-            
+      
 def drawGameOverPrompt(app):
     if app.gameOver == True:
         drawRect(app.width / 2 - 200, app.height / 2 - 300, 400, 600, border='red', borderWidth=5)
@@ -972,6 +871,26 @@ def drawBullets(app):
         if bullet.x > 0 and bullet.x < app.width and bullet.y > 0 and bullet.y < app.height:
             drawCircle(bullet.x, bullet.y, bullet.radius, fill=bullet.fill)
 
+def updatePlayerBullets(app):
+    for bullet in app.playerBullets:
+        if bullet.x > 0 and bullet.x < app.width and bullet.y > 0 and bullet.y < app.height:
+            bullet.x += bullet.dx
+            bullet.y += bullet.dy
+        else:
+            app.playerBullets.remove(bullet)
+
+def updateEnemyBullets(app):
+    for bullet in app.enemyBullets:
+        if bullet.x > 0 and bullet.x < app.width and bullet.y > 0 and bullet.y < app.height:
+            bullet.x += bullet.dx
+            bullet.y += bullet.dy
+            if circleCollidingCircle(app.px, app.py, app.pr, bullet.x, bullet.y, bullet.radius) and app.playerImmune == False:
+                app.playerHealth -= 1
+                app.playerImmune = True
+                app.background = 'crimson'
+        else:
+            app.enemyBullets.remove(bullet)
+
 def drawEnemies(app):
     for enemy in app.enemies:
         if isinstance(enemy, Ranger):
@@ -981,5 +900,142 @@ def drawEnemies(app):
             drawCircle(enemy.x, enemy.y, enemy.size, fill=enemy.fill)
         else:
             drawTriangle(enemy.x, enemy.y, enemy.size, enemy.fill, enemy.rotateAngle)
+
+def playerImmuneFrames(app):
+    if app.playerImmune == True:
+        app.pcolor = 'gray'
+        if app.iFrameCount == app.stepsPerSecond * 2:
+            app.playerImmune = False
+            app.iFrameCount = 0
+            app.pcolor = 'blue'
+        app.iFrameCount += 1
+
+def linerActions(app, enemy):
+    if enemy.count == 0:
+        enemy.count = 60
+        enemy.updateTarget(app)
+        enemy.x += enemy.dx
+        enemy.y += enemy.dy
+        enemy.rotateAngle = math.degrees(enemy.angle)
+    elif enemy.count <= 15:
+        enemy.count -= 1
+    else:
+        enemy.x += enemy.dx
+        enemy.y += enemy.dy
+        enemy.count -= 1
+
+def rangerActions(app, enemy):
+    if enemy.count == 0:
+        app.enemyBullets.append(EnemyBullet(enemy.x, enemy.y, app.px, app.py, 10, 50))
+        enemy.count = app.stepsPerSecond * 2
+        enemy.updateTarget(app)
+        enemy.x += enemy.dx
+        enemy.y += enemy.dy
+    else:
+        enemy.x += enemy.dx
+        enemy.y += enemy.dy
+        enemy.count -= 1
+
+# makes the Boss shoot every 2 seconds and shoot lightning if it is enraged
+def bossActions(app, enemy):
+    if not enemy.isEnraged:
+        if enemy.health == 50:
+            enemy.x = app.width / 2
+            enemy.y = app.height / 2
+            enemy.count = 30
+            enemy.fill = 'crimson'
+            enemy.originalFill = 'crimson'
+            enemy.isEnraged = True
+            enemy.isAnimating = True
+            enemy.targetPlayer(app)
+        if enemy.count == 0:
+            enemy.getRandomTarget(app)
+            enemy.x += enemy.dx
+            enemy.y += enemy.dy
+            enemy.count = 120
+        elif enemy.count == 60:
+            enemy.getRandomTarget(app)
+            enemy.x += enemy.dx
+            enemy.y += enemy.dy
+            enemy.count -= 1
+        else:
+            enemy.count -= 1
+            enemy.x += enemy.dx
+            enemy.y += enemy.dy
+    if enemy.isEnraged:
+        if enemy.isAnimating == True:
+            if enemy.size >= enemy.originalSize * 1.75:
+                enemy.isAnimating = False
+            if enemy.size < enemy.originalSize * 1.75:
+                enemy.size += 1
+        elif enemy.count == 0:
+            app.lightningBullets = []
+            app.lightningHitbox = []
+            for i in range(5):
+                distance = getDistance(enemy.x, enemy.y, enemy.targetX, enemy.targetY)
+                angle = calculateTheta(enemy.x, enemy.y, enemy.targetX, enemy.targetY)
+                dx = math.cos(angle) * (distance / 15)
+                dy = math.sin(angle) * (distance / 15)
+                if app.lightningHitbox == []:
+                    if abs(dx) < 30:
+                        app.lightningHitbox.extend([(enemy.x + 90, enemy.y), (enemy.targetX - 90, enemy.targetY)])
+                    else:
+                        app.lightningHitbox.extend([(enemy.x + dx, enemy.y), (enemy.targetX - dx, enemy.targetY)])
+                    if abs(dy) < 30:
+                        app.lightningHitbox.insert(1, (enemy.x, enemy.y + 90))
+                        app.lightningHitbox.append((enemy.targetX, enemy.targetY - 90))
+                    else:
+                        app.lightningHitbox.insert(1, (enemy.x, enemy.y + 90))
+                        app.lightningHitbox.append((enemy.targetX, enemy.targetY - dy))
+                app.lightningBullets.append(generateLightningPoints(enemy.x, enemy.y, enemy.targetX, enemy.targetY, 15))
+                enemy.count = 120
+        elif enemy.count == 115:
+            app.lightningBullets = []
+            for i in range(5):
+                app.lightningBullets.append(generateLightningPoints(enemy.x, enemy.y, enemy.targetX, enemy.targetY, 15))
+            enemy.count -= 1
+        elif enemy.count == 110:
+            app.lightningBullets = []
+            for i in range(5):
+                app.lightningBullets.append(generateLightningPoints(enemy.x, enemy.y, enemy.targetX, enemy.targetY, 15))
+            enemy.count -= 1
+        elif enemy.count == 30:
+            app.lightningBullets = []
+            enemy.targetPlayer(app)
+            enemy.count -= 1
+        else:
+            enemy.count -= 1
+
+# Makes the seeker enemy keep following current player location
+def seekerActions(app, enemy):
+    enemy.updateTarget(app)
+    enemy.x += enemy.dx
+    enemy.y += enemy.dy
+    enemy.rotateAngle += 15
+
+def enemyCollisionWithPlayer(app, enemy):
+    if app.playerImmune == False:
+        if isCollidingWithPlayer(enemy, app):
+            app.playerHealth -= 1
+            app.playerImmune = True
+            app.background = 'crimson'
+
+def enemyCollisionWithBullet(app, enemy, bullet):
+    if isinstance(enemy, Boss):
+        if circleCollidingCircle(bullet.x, bullet.y, bullet.radius, enemy.x, enemy.y, enemy.size):
+            enemy.health -= 1
+            if enemy.health == 0:
+                setActiveScreen('win')
+            enemy.fill = 'red'
+            app.playerBullets.remove(bullet)
+            if enemy.health == 0:
+                app.enemies.remove(enemy)
+    else:
+        if isCollidingWithEnemy(enemy, bullet):
+            enemy.health -= 1
+            enemy.fill = 'red'
+            app.playerBullets.remove(bullet)
+            if enemy.health == 0:
+                app.enemies.remove(enemy)
 
 cmu_graphics.runAppWithScreens(initialScreen='menu')

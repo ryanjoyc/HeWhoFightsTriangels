@@ -1,8 +1,9 @@
 import math
 import random
 
-class Enemy:
+class Enemy: # This basic enemy class is the seeker, and the other classes build off of it
     def __init__(self, app, speed, size, health, fill):
+        # Sets random spawn based on where the player first enters the room
         if app.px < app.width / 2:
             self.x = random.random() * app.width / 2 + app.width / 2
             self.y = random.random() * -100
@@ -25,7 +26,7 @@ class Enemy:
         self.dx = self.speed * math.cos(self.angle)
         self.dy = self.speed * math.sin(self.angle)
 
-class Liner(Enemy):
+class Liner(Enemy): # Has a count and rotate angle so it can update its position and change direction every once in a while
     def __init__(self, app, speed, size, health, fill):
         super().__init__(app, speed, size, health, fill)
         self.rotateAngle = self.angle
@@ -33,7 +34,7 @@ class Liner(Enemy):
     def updateTarget(self, app):
         super().updateTarget(app)
 
-class Ranger(Enemy):
+class Ranger(Enemy): # Has count as well and random spawn position so it can shoot every certain amount of time
     def __init__(self, app, speed, size, health, fill):
         super().__init__(app, 0, size, health, fill)
         self.y = random.random() * app.height
@@ -74,7 +75,8 @@ class Boss(Enemy):
             self.speed = getDistance(self.x, self.y, randomX, randomY) / app.stepsPerSecond
             self.dx = self.speed * math.cos(self.angle)
             self.dy = self.speed * math.sin(self.angle)
-
+        
+    # Sets its target to the player's current position, for the lightning
     def targetPlayer(self, app):
         self.targetX = app.px
         self.targetY = app.py
